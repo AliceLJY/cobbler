@@ -3,7 +3,7 @@ import { Accelerometer } from 'expo-sensors';
 import { createPetMachine, type Pose } from '../lib/pet-machine';
 
 export type MotionDebug = {
-  mag: number;      // 归一化后幅值(g)
+  mag: number;      // 归一化后幅值(g,粘性单位锁与状态机一致)
   peakDev: number;  // 近 2s 内 |mag-1| 峰值
 };
 
@@ -24,10 +24,8 @@ export function usePose(): { pose: Pose; debug: MotionDebug } {
         poseRef.current = next;
         setPose(next);
       }
-      // debug 数据(500ms 节流,不拖累渲染)
-      const rawMag = Math.hypot(x, y, z);
-      const mag = rawMag > 4 ? rawMag / 9.80665 : rawMag;
-      const dev = Math.abs(mag - 1);
+      // debug 数据来自状态机本体(同一套归一化),500ms 节流
+      const { mag, dev } = machineRef.current.debug();
       peaksRef.current.push({ t, dev });
       peaksRef.current = peaksRef.current.filter((p) => t - p.t <= 2000);
       if (t - lastDebugAt.current >= 500) {
