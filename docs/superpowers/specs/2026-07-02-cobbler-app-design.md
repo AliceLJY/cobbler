@@ -54,7 +54,7 @@ Mac mini(巢,权威状态)                Android 手机(身体)
 **心情判定规则**(确定性,不靠 LLM;优先级从上到下):
 1. `grumbly`:连续 ≥ 4 天无任何信号(无 commit、无 learnings 更新、无 app 心跳)
 2. `happy`:近 7 天 commit ≥ 5 或 learnings 本周有更新,且 3 天内有心跳
-3. `sleepy`:当天(截至生成时刻)零活动
+3. `sleepy`:昨天全天零活动(管线 07:30 跑,"当天零活动"恒真,故看昨天)
 4. `calm`:默认
 
 **generate.js** — 文案生成:
