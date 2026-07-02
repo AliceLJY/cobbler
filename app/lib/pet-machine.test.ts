@@ -48,6 +48,27 @@ test('步峰间隔过长不触发 bouncing', () => {
   assert.equal(run(m, samples), 'idle');
 });
 
+test('单位自适应:m/s² 读数(静止≈9.8)自动归一,走路仍触发 bouncing', () => {
+  const m = createPetMachine();
+  const G = 9.80665;
+  let samples: Sample[] = [];
+  for (let i = 0; i < 5; i++) {
+    samples.push(
+      { x: 0, y: 0, z: (1 + 0.3) * G, t: i * 500 },
+      { x: 0, y: 0.3 * G, z: G, t: i * 500 + 100 },
+      { x: 0, y: 0.3 * G, z: G, t: i * 500 + 200 },
+    );
+  }
+  assert.equal(run(m, samples), 'bouncing');
+});
+
+test('单位自适应:m/s² 放平 3s → sleeping', () => {
+  const m = createPetMachine();
+  const samples: Sample[] = [];
+  for (let t = 0; t < 3500; t += 100) samples.push({ x: 0.1, y: 0.15, z: 9.81, t });
+  assert.equal(run(m, samples), 'sleeping');
+});
+
 test('摇晃:1.2s 内 3 个剧烈峰 → dizzy,并保持 4s(优先于放平)', () => {
   const m = createPetMachine();
   let samples: Sample[] = [];

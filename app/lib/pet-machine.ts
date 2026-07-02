@@ -24,8 +24,13 @@ export function createPetMachine() {
   let shakeTimes: number[] = [];
   let dizzyUntil = -1;
 
-  function feed(s: Sample): Pose {
-    const mag = Math.hypot(s.x, s.y, s.z);
+  function feed(rawSample: Sample): Pose {
+    // 单位自适应:部分 Android 设备/版本实际回报 m/s²(静止幅值≈9.8)而非文档所称的 g。
+    // 幅值 >4 时按 m/s² 归一(g 单位下人力摇晃极限 ~3g,不会误伤)。
+    const rawMag = Math.hypot(rawSample.x, rawSample.y, rawSample.z);
+    const k = rawMag > 4 ? 1 / 9.80665 : 1;
+    const s = k === 1 ? rawSample : { x: rawSample.x * k, y: rawSample.y * k, z: rawSample.z * k, t: rawSample.t };
+    const mag = rawMag * k;
     const dev = Math.abs(mag - 1);
 
     // 峰检测(上穿 + 去抖)
