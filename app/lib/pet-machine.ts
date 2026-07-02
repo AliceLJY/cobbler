@@ -7,12 +7,14 @@ const FLAT_XY = 0.12;
 const SLEEP_AFTER_MS = 3000;
 const PEAK_ARM_BELOW = 0.35;   // 回落到此以下即可记下一峰(0.1 会在持续摇晃中永不 re-arm)
 const STEP_DEV = 0.18;         // 步峰下限
-const SHAKE_DEV = 1.3;         // 剧烈峰下限(Alice 实测走路峰值 ~1.0,0.9 线每步都误判剧烈)
 const STEP_GAP = [200, 1000] as const; // 一步产生高峰+深谷两峰,4Hz 峰频
 const STEPS_TO_BOUNCE = 3;     // 3 连击即颠,手感更快
 const BOUNCE_HOLD_MS = 2000;
-const SHAKE_WINDOW_MS = 1200;
-const SHAKES_TO_DIZZY = 3;
+// 摇晃 = 能量占比判据(数峰对手法太敏感:峰值不够线或节奏不合窗口都漏检)
+const DIZZY_ENERGY_DEV = 0.5;  // "高能量"样本门槛
+const DIZZY_WINDOW_MS = 1000;
+const DIZZY_RATIO = 0.6;       // 窗口内高能量占比 ≥60% 判摇晃(走路脉冲式占比 ~25%)
+const DIZZY_MIN_SAMPLES = 6;
 const DIZZY_HOLD_MS = 4000;
 
 export function createPetMachine() {
@@ -21,12 +23,12 @@ export function createPetMachine() {
   let lastStepAt: number | null = null;
   let stepStreak = 0;
   let bouncingUntil = -1;
-  let shakeTimes: number[] = [];
   let dizzyUntil = -1;
   let msq = false;             // 单位粘性锁:见过幅值>4 即永久判定 m/s² 设备
   let lastMag = 1;
   let lastDev = 0;
   let lastRawMag = 1;
+  let recentDevs: { t: number; dev: number }[] = [];
 
   function feed(rawSample: Sample): Pose {
     // 单位自适应(粘性):部分 Android 设备实际回报 m/s²(静止≈9.8)而非文档所称的 g。
@@ -42,23 +44,28 @@ export function createPetMachine() {
     lastDev = dev;
     lastRawMag = rawMag;
 
-    // 峰检测(上穿 + 去抖)
+    // 步峰检测(上穿 + 去抖)
     if (armed && dev >= STEP_DEV) {
       armed = false;
-      if (dev >= SHAKE_DEV) {
-        shakeTimes.push(s.t);
-        shakeTimes = shakeTimes.filter((t) => s.t - t <= SHAKE_WINDOW_MS);
-        if (shakeTimes.length >= SHAKES_TO_DIZZY) dizzyUntil = s.t + DIZZY_HOLD_MS;
-        stepStreak = 0; // 剧烈动作打断步伐
-        lastStepAt = null;
-      } else {
-        const gap = lastStepAt === null ? null : s.t - lastStepAt;
-        stepStreak = gap !== null && gap >= STEP_GAP[0] && gap <= STEP_GAP[1] ? stepStreak + 1 : 1;
-        lastStepAt = s.t;
-        if (stepStreak >= STEPS_TO_BOUNCE) bouncingUntil = s.t + BOUNCE_HOLD_MS;
-      }
+      const gap = lastStepAt === null ? null : s.t - lastStepAt;
+      stepStreak = gap !== null && gap >= STEP_GAP[0] && gap <= STEP_GAP[1] ? stepStreak + 1 : 1;
+      lastStepAt = s.t;
+      if (stepStreak >= STEPS_TO_BOUNCE) bouncingUntil = s.t + BOUNCE_HOLD_MS;
     } else if (dev < PEAK_ARM_BELOW) {
       armed = true;
+    }
+
+    // 摇晃检测(能量占比)
+    recentDevs.push({ t: s.t, dev });
+    recentDevs = recentDevs.filter((r) => s.t - r.t <= DIZZY_WINDOW_MS);
+    if (recentDevs.length >= DIZZY_MIN_SAMPLES) {
+      const hot = recentDevs.filter((r) => r.dev > DIZZY_ENERGY_DEV).length;
+      if (hot / recentDevs.length >= DIZZY_RATIO) {
+        dizzyUntil = s.t + DIZZY_HOLD_MS;
+        stepStreak = 0;
+        lastStepAt = null;
+        bouncingUntil = -1;
+      }
     }
 
     // 放平计时
