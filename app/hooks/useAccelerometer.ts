@@ -5,11 +5,13 @@ import { createPetMachine, type Pose } from '../lib/pet-machine';
 export type MotionDebug = {
   mag: number;      // 归一化后幅值(g,粘性单位锁与状态机一致)
   peakDev: number;  // 近 2s 内 |mag-1| 峰值
+  rawMag: number;   // 原始未归一幅值(区分设备单位)
+  msq: boolean;     // 粘性锁是否已判定 m/s²
 };
 
 export function usePose(): { pose: Pose; debug: MotionDebug } {
   const [pose, setPose] = useState<Pose>('idle');
-  const [debug, setDebug] = useState<MotionDebug>({ mag: 1, peakDev: 0 });
+  const [debug, setDebug] = useState<MotionDebug>({ mag: 1, peakDev: 0, rawMag: 1, msq: false });
   const machineRef = useRef(createPetMachine());
   const poseRef = useRef<Pose>('idle');
   const peaksRef = useRef<{ t: number; dev: number }[]>([]);
@@ -25,12 +27,12 @@ export function usePose(): { pose: Pose; debug: MotionDebug } {
         setPose(next);
       }
       // debug 数据来自状态机本体(同一套归一化),500ms 节流
-      const { mag, dev } = machineRef.current.debug();
+      const { mag, dev, rawMag, msq } = machineRef.current.debug();
       peaksRef.current.push({ t, dev });
       peaksRef.current = peaksRef.current.filter((p) => t - p.t <= 2000);
       if (t - lastDebugAt.current >= 500) {
         lastDebugAt.current = t;
-        setDebug({ mag, peakDev: Math.max(...peaksRef.current.map((p) => p.dev)) });
+        setDebug({ mag, peakDev: Math.max(...peaksRef.current.map((p) => p.dev)), rawMag, msq });
       }
     });
     return () => sub.remove();

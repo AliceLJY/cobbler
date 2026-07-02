@@ -26,6 +26,7 @@ export function createPetMachine() {
   let msq = false;             // 单位粘性锁:见过幅值>4 即永久判定 m/s² 设备
   let lastMag = 1;
   let lastDev = 0;
+  let lastRawMag = 1;
 
   function feed(rawSample: Sample): Pose {
     // 单位自适应(粘性):部分 Android 设备实际回报 m/s²(静止≈9.8)而非文档所称的 g。
@@ -39,6 +40,7 @@ export function createPetMachine() {
     const dev = Math.abs(mag - 1);
     lastMag = mag;
     lastDev = dev;
+    lastRawMag = rawMag;
 
     // 峰检测(上穿 + 去抖)
     if (armed && dev >= STEP_DEV) {
@@ -74,7 +76,7 @@ export function createPetMachine() {
   }
 
   function debug() {
-    return { mag: lastMag, dev: lastDev };
+    return { mag: lastMag, dev: lastDev, rawMag: lastRawMag, msq };
   }
 
   return { feed, debug };
