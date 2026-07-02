@@ -6,7 +6,7 @@ import { OfflineBadge } from './components/OfflineBadge';
 import { usePose } from './hooks/useAccelerometer';
 import { useNestData } from './hooks/useNestData';
 
-const SHOW_DEBUG = true; // 调参期开;定参后关
+const SHOW_DEBUG = false; // 调参期开;定参后关(2026-07-03 三互动真机验收通过)
 
 export default function App() {
   const { pose, debug } = usePose();
