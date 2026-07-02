@@ -7,8 +7,8 @@ const FLAT_XY = 0.12;
 const SLEEP_AFTER_MS = 3000;
 const PEAK_ARM_BELOW = 0.1;    // 回落到此以下才允许记下一个峰(去抖)
 const STEP_DEV = 0.18;         // 步峰下限
-const SHAKE_DEV = 0.6;         // 剧烈峰下限
-const STEP_GAP = [250, 1000] as const;
+const SHAKE_DEV = 0.9;         // 剧烈峰下限(实测走路失重深谷可达 ~0.67,0.6 会误触)
+const STEP_GAP = [200, 1000] as const; // 一步产生高峰+深谷两峰,4Hz 峰频
 const STEPS_TO_BOUNCE = 4;
 const BOUNCE_HOLD_MS = 2000;
 const SHAKE_WINDOW_MS = 1200;
@@ -23,15 +23,22 @@ export function createPetMachine() {
   let bouncingUntil = -1;
   let shakeTimes: number[] = [];
   let dizzyUntil = -1;
+  let msq = false;             // 单位粘性锁:见过幅值>4 即永久判定 m/s² 设备
+  let lastMag = 1;
+  let lastDev = 0;
 
   function feed(rawSample: Sample): Pose {
-    // 单位自适应:部分 Android 设备/版本实际回报 m/s²(静止幅值≈9.8)而非文档所称的 g。
-    // 幅值 >4 时按 m/s² 归一(g 单位下人力摇晃极限 ~3g,不会误伤)。
+    // 单位自适应(粘性):部分 Android 设备实际回报 m/s²(静止≈9.8)而非文档所称的 g。
+    // g 设备人力极限 ~3g 永远到不了 4;m/s² 设备静止即 9.8,首秒必锁定。
+    // 锁定必须粘性:m/s² 设备在走路失重相位瞬时幅值可低于 4,逐样本判断会撕裂波形。
     const rawMag = Math.hypot(rawSample.x, rawSample.y, rawSample.z);
-    const k = rawMag > 4 ? 1 / 9.80665 : 1;
+    if (rawMag > 4) msq = true;
+    const k = msq ? 1 / 9.80665 : 1;
     const s = k === 1 ? rawSample : { x: rawSample.x * k, y: rawSample.y * k, z: rawSample.z * k, t: rawSample.t };
     const mag = rawMag * k;
     const dev = Math.abs(mag - 1);
+    lastMag = mag;
+    lastDev = dev;
 
     // 峰检测(上穿 + 去抖)
     if (armed && dev >= STEP_DEV) {
@@ -66,5 +73,9 @@ export function createPetMachine() {
     return 'idle';
   }
 
-  return { feed };
+  function debug() {
+    return { mag: lastMag, dev: lastDev };
+  }
+
+  return { feed, debug };
 }

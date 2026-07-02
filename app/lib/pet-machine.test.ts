@@ -62,6 +62,26 @@ test('单位自适应:m/s² 读数(静止≈9.8)自动归一,走路仍触发 bou
   assert.equal(run(m, samples), 'bouncing');
 });
 
+test('粘性锁:m/s² 设备失重相位(rawMag<4)不撕裂波形、深谷不误判摇晃', () => {
+  const m = createPetMachine();
+  const G = 9.80665;
+  // 先喂一帧静止(rawMag≈9.8)锁定 m/s²
+  m.feed({ x: 0.1, y: 0.1, z: G, t: 0 });
+  // Alice 实测走路波形:高峰 ~13 m/s² 与深谷 ~3.27 m/s² 交替(锁定后深谷 dev≈0.67,不该算 shake)
+  let samples: Sample[] = [];
+  for (let i = 0; i < 6; i++) {
+    const base = 300 + i * 500;
+    samples.push(
+      { x: 0, y: 0, z: 13, t: base },            // 撞击高峰 dev≈0.33
+      { x: 0, y: 0, z: G, t: base + 120 },       // 回落 re-arm
+      { x: 0, y: 0, z: 3.27, t: base + 250 },    // 失重深谷 dev≈0.67(<0.9 仍是步峰)
+      { x: 0, y: 0, z: G, t: base + 380 },       // 回落 re-arm
+    );
+  }
+  const last = run(m, samples);
+  assert.equal(last, 'bouncing'); // 步峰连续 → 颠,绝不是 dizzy
+});
+
 test('单位自适应:m/s² 放平 3s → sleeping', () => {
   const m = createPetMachine();
   const samples: Sample[] = [];
