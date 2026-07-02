@@ -1,12 +1,26 @@
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { loadLearnings } from './lib/parse-learnings.js';
 import { scanGit } from './lib/scan-git.js';
 import { readJSON } from './lib/store.js';
 import { diffDays, localDateISO } from './lib/dates.js';
 
-export async function collect({ learningsDir, projectsDir, dataDir, todayISO }) {
+const pexec = promisify(execFile);
+
+async function gitIdentity() {
+  try {
+    const [email, name] = await Promise.all([
+      pexec('git', ['config', '--global', 'user.email']).then((r) => r.stdout.trim()),
+      pexec('git', ['config', '--global', 'user.name']).then((r) => r.stdout.trim()),
+    ]);
+    return email && name ? { email, name } : null;
+  } catch { return null; }
+}
+
+export async function collect({ learningsDir, projectsDir, dataDir, todayISO, authors }) {
   const learnings = await loadLearnings(learningsDir);
-  const git = await scanGit(projectsDir, todayISO);
+  const git = await scanGit(projectsDir, todayISO, { authors: authors ?? await gitIdentity() });
   const heartbeats = await readJSON(join(dataDir, 'heartbeats.json'), []);
 
   const hbDates = heartbeats.map((iso) => localDateISO(new Date(iso)));

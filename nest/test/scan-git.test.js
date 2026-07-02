@@ -13,6 +13,30 @@ function git(cwd, args, dateISO) {
   });
 }
 
+test('scanGit 按 author 过滤:clone 的别人仓库历史不算她的', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'proj-'));
+  const repo = join(root, 'cloned');
+  await mkdir(repo);
+  git(repo, ['init', '-b', 'main'], '2026-07-01');
+  await writeFile(join(repo, 'a.txt'), '1');
+  git(repo, ['add', '.'], '2026-07-01');
+  // 别人的 commit(近 7 天内)
+  execFileSync('git', ['-c', 'user.email=ben@other.dev', '-c', 'user.name=Ben', 'commit', '-m', 'their merge'], {
+    cwd: repo,
+    env: { ...process.env, GIT_AUTHOR_DATE: '2026-07-01T12:00:00', GIT_COMMITTER_DATE: '2026-07-01T12:00:00' },
+  });
+  await writeFile(join(repo, 'a.txt'), '2');
+  git(repo, ['add', '.'], '2026-07-01');
+  // 她的 commit(用测试身份 t@t / t)
+  git(repo, ['commit', '-m', 'her fix'], '2026-06-30');
+
+  const r = await scanGit(root, '2026-07-02', { authors: { email: 't@t', name: 't' } });
+  assert.equal(r.items.length, 1);
+  assert.equal(r.items[0].title, 'her fix');
+  assert.equal(r.commits7d, 1); // 别人的 7 天内 commit 不算她的活跃
+  assert.equal(r.lastCommitDate, '2026-06-30');
+});
+
 test('scanGit counts recent commits and lists history', async () => {
   const root = await mkdtemp(join(tmpdir(), 'proj-'));
   const repo = join(root, 'demo');
