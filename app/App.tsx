@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, StyleSheet, Text } from 'react-native';
 import { CobblerStage } from './components/CobblerStage';
@@ -5,12 +6,17 @@ import { CardDrawer } from './components/CardDrawer';
 import { OfflineBadge } from './components/OfflineBadge';
 import { usePose } from './hooks/useAccelerometer';
 import { useNestData } from './hooks/useNestData';
+import { ensureDailyNudge } from './lib/notifications';
 
 const SHOW_DEBUG = false; // 调参期开;定参后关(2026-07-03 三互动真机验收通过)
 
 export default function App() {
   const { pose, debug } = usePose();
   const { data } = useNestData();
+
+  useEffect(() => {
+    ensureDailyNudge();
+  }, []);
 
   return (
     <SafeAreaView style={styles.root}>
