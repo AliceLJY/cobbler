@@ -19,7 +19,7 @@ export default function App() {
       <CobblerStage pose={pose} mood={data.state?.mood ?? null} mutter={data.state?.mutter ?? null} />
       {SHOW_DEBUG && (
         <Text style={styles.debug}>
-          {pose} · mag {debug.mag.toFixed(2)} · peak2s {debug.peakDev.toFixed(2)} · raw {debug.rawMag.toFixed(1)}{debug.msq ? ' · m/s²锁' : ''}
+          {pose} · mag {debug.mag.toFixed(2)} · peak2s {debug.peakDev.toFixed(2)} · raw {debug.rawMag.toFixed(1)} · n{debug.samples} · {debug.status}{debug.msq ? ' · m/s²锁' : ''}
         </Text>
       )}
       <CardDrawer state={data.state} todayCard={data.todayCard} cards={data.cards} />
