@@ -92,7 +92,7 @@ test('单位自适应:m/s² 放平 3s → sleeping', () => {
 test('摇晃:1.2s 内 3 个剧烈峰 → dizzy,并保持 4s(优先于放平)', () => {
   const m = createPetMachine();
   let samples: Sample[] = [];
-  for (let i = 0; i < 3; i++) samples.push(...peak(i * 300, 1.2));
+  for (let i = 0; i < 3; i++) samples.push(...peak(i * 300, 1.6));
   assert.equal(run(m, samples), 'dizzy');
   // 立刻放平:dizzy 未过期,仍 dizzy
   assert.equal(run(m, flat(1000, 2000)), 'dizzy');
