@@ -13,7 +13,7 @@
 - 零 npm 外部依赖(全部 `node:` 内建;数据源是纯文本文件和 git CLI)
 - 数据源(spec 定死):`~/Downloads/sync-bridge/cc-memory/learnings/*.md` + `~/Projects/*/` git log + `data/heartbeats.json`;RecallNest 不接
 - 心情规则优先级:grumbly(≥4 天无信号)> happy(commits7d≥5 或本周 learnings,且 3 天内心跳)> sleepy(昨天全天零活动)> calm
-- 卡片规则:MM-DD 同日最旧优先;无同日随机挑 >30 天前;素材空则无卡(API 404)
+- 卡片规则:DD 同日("每月的今天")最旧优先;无同日随机挑 >30 天前;素材空则无卡(API 404)。(执行期修正:原写 MM-DD 同日,但数据仅 2026 年起,MM-DD 匹配一年内恒空)
 - 文案长度:cardBody ≤100 字、mutter ≤40 字;claude 失败必走模板,管线永不空手
 - diary 保留最近 14 条;heartbeats 保留最近 100 条
 - API bind 127.0.0.1:8790;写文件一律原子写(tmp+rename)
