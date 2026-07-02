@@ -22,6 +22,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0e675788-9660-4e6c-8400-5dc9698ceab3"
+      }
+    },
+    "owner": "aliceljy"
   }
 }
