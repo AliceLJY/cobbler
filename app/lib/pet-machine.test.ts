@@ -89,13 +89,31 @@ test('单位自适应:m/s² 放平 3s → sleeping', () => {
   assert.equal(run(m, samples), 'sleeping');
 });
 
-test('摇晃:1.2s 内 3 个剧烈峰 → dizzy,并保持 4s(优先于放平)', () => {
+test('摇晃:持续高能量 1s → dizzy,并保持 4s(优先于放平)', () => {
   const m = createPetMachine();
-  let samples: Sample[] = [];
-  for (let i = 0; i < 3; i++) samples.push(...peak(i * 300, 1.6));
+  // 摇晃波形:10Hz 采样,dev 在 0.6~1.4 连续波动 1.2s(不依赖离散峰)
+  const samples: Sample[] = [];
+  for (let t = 0; t <= 1200; t += 100) {
+    const dev = 0.6 + 0.8 * Math.abs(Math.sin(t / 80));
+    samples.push({ x: 0, y: 0, z: 1 + dev, t });
+  }
   assert.equal(run(m, samples), 'dizzy');
   // 立刻放平:dizzy 未过期,仍 dizzy
-  assert.equal(run(m, flat(1000, 2000)), 'dizzy');
-  // dizzy 过期后继续放平满 3s → sleeping
-  assert.equal(run(m, flat(3000, 4500)), 'sleeping');
+  assert.equal(run(m, flat(1300, 2000)), 'dizzy');
+  // dizzy 过期后继续放平 → sleeping
+  assert.equal(run(m, flat(3300, 4500)), 'sleeping');
+});
+
+test('走路脉冲波形高能量占比低,不误判摇晃', () => {
+  const m = createPetMachine();
+  // 走路:每 500ms 一个短脉冲峰(dev 1.0,仅 1 帧),其余低能量
+  let samples: Sample[] = [];
+  for (let i = 0; i < 8; i++) {
+    const base = i * 500;
+    samples.push({ x: 0, y: 0, z: 2.0, t: base });          // 峰 dev 1.0
+    for (let dt = 100; dt < 500; dt += 100) {
+      samples.push({ x: 0, y: 0.25, z: 1, t: base + dt });  // 谷,手持微动
+    }
+  }
+  assert.equal(run(m, samples), 'bouncing'); // 是颠,不是晕
 });
