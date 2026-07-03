@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getLastSeenDiaryDate, markDiarySeen, type NestCard, type NestState } from '../lib/api';
+import bubble from '../modules/cobbler-bubble';
 
 export function CardDrawer({ state, todayCard, cards }: {
   state: NestState | null;
@@ -9,10 +10,27 @@ export function CardDrawer({ state, todayCard, cards }: {
 }) {
   const [open, setOpen] = useState(false);
   const [lastSeen, setLastSeen] = useState('');
+  const [bubbleOn, setBubbleOn] = useState(false);
 
   useEffect(() => {
     getLastSeenDiaryDate().then(setLastSeen);
+    if (bubble) setBubbleOn(bubble.isShowing());
   }, []);
+
+  const toggleBubble = () => {
+    if (!bubble) return;
+    if (bubbleOn) {
+      bubble.hide();
+      setBubbleOn(false);
+      return;
+    }
+    if (!bubble.canDrawOverlays()) {
+      bubble.requestOverlayPermission(); // 去系统设置开"显示在其他应用上层",回来再点一次
+      return;
+    }
+    const ok = bubble.show(state?.mood ?? 'calm');
+    setBubbleOn(ok);
+  };
 
   const newDiary = useMemo(
     () => (state?.diary ?? []).filter((d) => d.date > lastSeen),
@@ -39,6 +57,16 @@ export function CardDrawer({ state, todayCard, cards }: {
       </Pressable>
       {open && (
         <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 24 }}>
+          {!!bubble && (
+            <Pressable onPress={toggleBubble} style={styles.bubbleRow}>
+              <Text style={styles.bubbleRowText}>
+                屏上泡泡 {bubbleOn ? '● 开' : '○ 关'}
+              </Text>
+              <Text style={styles.bubbleRowHint}>
+                {bubbleOn ? '她浮在屏幕上,点她回家' : '首次开启会跳系统设置,允许后回来再点一次'}
+              </Text>
+            </Pressable>
+          )}
           {newDiary.length > 0 && (
             <View style={styles.diaryBox}>
               <Text style={styles.sectionTitle}>她攒的话</Text>
@@ -78,6 +106,12 @@ const styles = StyleSheet.create({
   handleText: { flex: 1, fontSize: 15, fontWeight: '700', color: '#111' },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFDE59', borderWidth: 2, borderColor: '#111' },
   body: { marginTop: 12 },
+  bubbleRow: {
+    backgroundColor: '#fff', borderWidth: 2, borderColor: '#111', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8,
+  },
+  bubbleRowText: { fontSize: 14, fontWeight: '700', color: '#111' },
+  bubbleRowHint: { fontSize: 11, color: '#111', opacity: 0.55, marginTop: 2 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#111', opacity: 0.7, marginBottom: 6, marginTop: 10 },
   diaryBox: {
     backgroundColor: '#fff', borderWidth: 3, borderColor: '#111', borderRadius: 12,
