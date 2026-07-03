@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cobbler",
     "slug": "cobbler",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
