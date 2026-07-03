@@ -1154,7 +1154,7 @@ Expected: 依然 `ok mood=...`,mutter 来自模板池
 
 - [ ] **Step 6: 配 tailscale serve 并从 tailnet 验证**
 
-Run: install.sh 打印的其中一条(按 `tailscale serve status` 现状选);然后 `curl -sk https://mac-mini.tail791fb9.ts.net:8443/api/state | head -c 200`(或路径版对应 URL)
+Run: install.sh 打印的其中一条(按 `tailscale serve status` 现状选);然后 `curl -sk https://your-nest.your-tailnet.ts.net:8443/api/state | head -c 200`(或路径版对应 URL)
 Expected: 与本地 curl 相同 JSON
 
 - [ ] **Step 7: 根 README 骨架 + 最终 commit**

@@ -9,7 +9,7 @@
 
 ## Global Constraints
 
-- BASE_URL 可配,默认 `https://mac-mini.tail791fb9.ts.net:10000`(app 内设置项可改,兼容 IP 直连 `https://100.74.112.75:10000`)
+- BASE_URL 可配,默认 `https://your-nest.your-tailnet.ts.net:10000`(app 内设置项可改,兼容 IP 直连 `https://100.x.y.z:10000`)
 - 传感器单位:expo-sensors Accelerometer 返回 g(1g=9.8m/s²),阈值全用 g,实机调参
 - 行为优先级:dizzy > sleeping > bouncing > idle(idle 时显示巢基调心情)
 - 离巢容错:任何 API 失败 → AsyncStorage 缓存渲染 + "离巢"角标;传感器互动照常

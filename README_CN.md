@@ -34,9 +34,21 @@ bash install.sh          # 装两个 launchd 服务(每日 07:30 + 常驻 API)
 tailscale serve --bg --https=10000 http://127.0.0.1:8790   # 在 tailnet 内暴露
 ```
 
+## 接入你自己的历史
+
+巢吃两种数据源,都可插拔、都可缺席:
+
+- **git 历史**——人人都有。`nest/collect.js` 扫描 `~/Projects/*/` 下所有仓库,只统计**你本人** author 的提交(身份读自 `git config --global`)。fork 下来跑起巢,你的 Cobbler 第一天就能从你自己的 commit 里挖出"N 个月前的今天"。
+- **学习打卡**——我个人的 markdown 打卡表格式(`YYYY-MM.md` 里的 `| # | MM-DD | 来源 | 主题 |` 行)。目录不存在时管线自动跳过。想接自己的日记/笔记,仿照 `nest/lib/parse-learnings.js` 写个解析器,返回 `{date, kind, title, detail}` 就能直接插上。
+
+无账号、无云端、无遥测:你的历史留在你自己的机器上,每日卡片由本地 `claude -p` 撰写(Claude 不可用时走纯模板兜底)。
+
 ## 状态
 
-- [x] 巢:管线 + API + launchd,在 mini 上运行中
-- [ ] 身体:Expo Android(传感器互动、卡片抽屉)
+- [x] 巢:每日管线 + API + launchd + 惰性自愈(v0.1–0.3)
+- [x] 身体:传感器互动(放平/走路/摇晃)、卡片抽屉、离巢缓存(v0.1)
+- [x] 每日本地通知(v0.2),触摸玩法——点击烟花/拖拽回弹(v0.3)
+- [x] 屏上泡泡——小脸悬浮于任意 app 之上,拖动贴边,点击回家(v0.4,Kotlin 原生模块)
+- [ ] 泡泡表情随心情、手绘美术、FCM 推送
 
-个人玩具,为一个用户而做。与 Anthropic 无关;Cobbler 的性格文本源自已下架的 Buddy 功能,在此留存,作为一种纪念。
+个人玩具,为一个用户而做,原样分享。与 Anthropic 无关;Cobbler 的性格文本源自已下架的 Buddy 功能,在此留存,作为一种纪念。

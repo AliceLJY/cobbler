@@ -29,16 +29,30 @@ Mac mini (the nest)                      Android phone (the body)
 
 ```sh
 cd nest
-npm test                 # 34 tests, node:test, no deps
+npm test                 # 36 tests, node:test, no deps
 node generate.js         # run the daily pipeline once
 node server.js           # serve the API on 127.0.0.1:8790
 bash install.sh          # install both launchd services (daily 07:30 + keep-alive API)
 tailscale serve --bg --https=10000 http://127.0.0.1:8790   # expose inside your tailnet
 ```
 
+App builds read the nest URL from the `EXPO_PUBLIC_NEST_URL` environment variable (set it as an EAS env var; nothing private lives in this repo).
+
+## Bring your own history
+
+The nest feeds on two sources, both pluggable and both optional:
+
+- **git history** — everyone has this. `nest/collect.js` scans every repo under `~/Projects/*/` and only counts commits *you* authored (identity read from `git config --global`). Fork the repo, run the nest, and your Cobbler digs "this day N months ago" out of your own commits from day one.
+- **learning logs** — my personal markdown check-in tables (`| # | MM-DD | source | topic |` rows in `YYYY-MM.md` files). If the directory doesn't exist, the pipeline silently skips it. To feed your own journal/notes, mimic `nest/lib/parse-learnings.js` — any parser that returns `{date, kind, title, detail}` items plugs straight in.
+
+No accounts, no cloud, no telemetry: your history stays on your machine, and the daily card is written by a local `claude -p` call (with plain-template fallback if Claude is unavailable).
+
 ## Status
 
-- [x] Nest: pipeline + API + launchd, running on the mini
-- [ ] App: Expo Android (sensor play, card drawer)
+- [x] Nest: daily pipeline + API + launchd + lazy self-heal (v0.1–0.3)
+- [x] App: sensor play (lay flat / walk / shake), card drawer, offline cache (v0.1)
+- [x] Daily local notification (v0.2), touch play — poke fireworks / drag & spring-back (v0.3)
+- [x] Floating bubble overlay — Cobbler's face floats over any app, drag to snap, tap to return (v0.4, native Kotlin module)
+- [ ] Mood-aware bubble face, hand-drawn art pass, FCM push
 
-Personal toy, built for one user. Not affiliated with Anthropic; Cobbler's personality text originates from the discontinued Buddy feature and is preserved here as an act of remembrance.
+Personal toy, built for one user, shared as-is. Not affiliated with Anthropic; Cobbler's personality text originates from the discontinued Buddy feature and is preserved here as an act of remembrance.
