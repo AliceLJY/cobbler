@@ -9,7 +9,8 @@ function send(res, status, obj) {
   res.end(body);
 }
 
-export function createServer({ dataDir }) {
+export function createServer({ dataDir, onMissingToday }) {
+  let generating = false;
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://x');
@@ -19,7 +20,13 @@ export function createServer({ dataDir }) {
       }
       if (req.method === 'GET' && url.pathname === '/api/card/today') {
         const c = await readCardByDate(dataDir, localDateISO());
-        return c ? send(res, 200, c) : send(res, 404, { error: 'no card today' });
+        if (c) return send(res, 200, c);
+        // 今日卡缺失(mini 睡过 7:30 等) → 惰性补跑一轮管线,自愈
+        if (onMissingToday && !generating) {
+          generating = true;
+          Promise.resolve(onMissingToday()).finally(() => { generating = false; });
+        }
+        return send(res, 404, { error: 'no card today', generating: true });
       }
       if (req.method === 'GET' && url.pathname === '/api/cards') {
         const limit = Math.min(Number(url.searchParams.get('limit')) || 30, 100);
@@ -40,7 +47,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dataDir = new URL('./data', import.meta.url).pathname;
   const port = Number(process.env.COBBLER_PORT) || 8790;
   const host = process.env.COBBLER_HOST || '127.0.0.1';
-  createServer({ dataDir }).listen(port, host, () => {
+  const HOME = process.env.HOME;
+  const onMissingToday = async () => {
+    const { runPipeline } = await import('./generate.js');
+    const { localDateISO: today } = await import('./lib/dates.js');
+    console.log('[cobbler-api] today card missing, lazy-generating…');
+    await runPipeline({
+      learningsDir: `${HOME}/Downloads/sync-bridge/cc-memory/learnings`,
+      projectsDir: `${HOME}/Projects`,
+      dataDir,
+      personaPath: new URL('./persona.md', import.meta.url).pathname,
+      todayISO: today(),
+    }).catch((e) => console.error('[cobbler-api] lazy generate failed', e));
+  };
+  createServer({ dataDir, onMissingToday }).listen(port, host, () => {
     console.log(`[cobbler-api] listening on ${host}:${port}`);
   });
 }

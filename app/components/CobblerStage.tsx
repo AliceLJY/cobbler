@@ -1,16 +1,87 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { CobblerFigure } from './CobblerFigure';
+import { Animated, Easing, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CobblerFigure, type FaceOverride } from './CobblerFigure';
 import type { Pose } from '../lib/pet-machine';
 import type { Mood } from '../lib/api';
 
 const DIZZY_LINE = '……你晃什么。';
+const PALETTE = ['#FF5DA2', '#FFDE59', '#FFFFFF', '#5EC8FF', '#111111'];
+const PARTICLES = 14;
+
+function Fireworks({ burst }: { burst: number }) {
+  const progress = useRef(new Animated.Value(0)).current;
+  const [particles, setParticles] = useState<{ angle: number; dist: number; color: string; size: number }[]>([]);
+
+  useEffect(() => {
+    if (!burst) return;
+    setParticles(Array.from({ length: PARTICLES }, (_, i) => ({
+      angle: (Math.PI * 2 * i) / PARTICLES + Math.random() * 0.4,
+      dist: 75 + Math.random() * 70,
+      color: PALETTE[i % PALETTE.length],
+      size: 8 + Math.random() * 8,
+    })));
+    progress.setValue(0);
+    Animated.timing(progress, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+      .start(() => setParticles([]));
+  }, [burst, progress]);
+
+  return (
+    <View pointerEvents="none" style={styles.fireworksLayer}>
+      {particles.map((p, i) => {
+        const tx = progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(p.angle) * p.dist] });
+        const tyP = progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(p.angle) * p.dist] });
+        const op = progress.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 1, 0] });
+        const sc = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] });
+        return (
+          <Animated.View
+            key={i}
+            style={[styles.particle, {
+              width: p.size, height: p.size, borderRadius: p.size / 2, backgroundColor: p.color,
+              opacity: op, transform: [{ translateX: tx }, { translateY: tyP }, { scale: sc }],
+            }]}
+          />
+        );
+      })}
+    </View>
+  );
+}
 
 export function CobblerStage({ pose, mood, mutter }: { pose: Pose; mood: Mood | null; mutter: string | null }) {
   const [showBubble, setShowBubble] = useState(true);
+  const [touched, setTouched] = useState(false);
+  const [party, setParty] = useState(false);
+  const [burst, setBurst] = useState(0);
   const scale = useRef(new Animated.Value(1)).current;
   const ty = useRef(new Animated.Value(0)).current;
   const rot = useRef(new Animated.Value(0)).current;
+  const drag = useRef(new Animated.ValueXY()).current;
+  const touchStartAt = useRef(0);
+  const partyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 拖动跟手 + 松手回弹;快速小位移 = 点一下 → 烟花
+  const pan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      touchStartAt.current = Date.now();
+      setTouched(true);
+    },
+    onPanResponderMove: Animated.event([null, { dx: drag.x, dy: drag.y }], { useNativeDriver: false }),
+    onPanResponderRelease: (_, g) => {
+      setTouched(false);
+      const isTap = Math.abs(g.dx) < 10 && Math.abs(g.dy) < 10 && Date.now() - touchStartAt.current < 300;
+      if (isTap) {
+        setBurst((b) => b + 1);
+        setParty(true);
+        if (partyTimer.current) clearTimeout(partyTimer.current);
+        partyTimer.current = setTimeout(() => setParty(false), 900);
+      }
+      Animated.spring(drag, { toValue: { x: 0, y: 0 }, friction: 5, tension: 60, useNativeDriver: false }).start();
+    },
+    onPanResponderTerminate: () => {
+      setTouched(false);
+      Animated.spring(drag, { toValue: { x: 0, y: 0 }, friction: 5, tension: 60, useNativeDriver: false }).start();
+    },
+  })).current;
 
   // 呼吸(常驻,sleeping 时放慢)
   useEffect(() => {
@@ -54,20 +125,27 @@ export function CobblerStage({ pose, mood, mutter }: { pose: Pose; mood: Mood | 
 
   const rotate = rot.interpolate({ inputRange: [-1, 1], outputRange: ['-12deg', '12deg'] });
   const bubbleText = pose === 'dizzy' ? DIZZY_LINE : mutter;
+  const override: FaceOverride = touched ? 'touched' : party ? 'party' : null;
 
   return (
     <View style={styles.stage}>
-      {showBubble && !!bubbleText && pose !== 'sleeping' && (
-        <View style={styles.bubble}>
+      {showBubble && !!bubbleText && pose !== 'sleeping' ? (
+        <Pressable onPress={() => setShowBubble(false)} style={styles.bubble}>
           <Text style={styles.bubbleText}>{bubbleText}</Text>
-        </View>
-      )}
+        </Pressable>
+      ) : !!bubbleText && pose !== 'sleeping' ? (
+        <Pressable onPress={() => setShowBubble(true)} style={styles.bubbleDot}>
+          <Text style={styles.bubbleDotText}>…</Text>
+        </Pressable>
+      ) : null}
       {pose === 'sleeping' && <Text style={styles.zzz}>Z z z</Text>}
-      <Pressable onPress={() => setShowBubble((v) => !v)}>
+      {/* 外层:拖动位移(JS 驱动);内层:呼吸/颠/晃(native 驱动)——两层分离避免混驱动冲突 */}
+      <Animated.View {...pan.panHandlers} style={{ transform: drag.getTranslateTransform() }}>
         <Animated.View style={{ transform: [{ scale }, { translateY: ty }, { rotate }] }}>
-          <CobblerFigure pose={pose} mood={mood} />
+          <Fireworks burst={burst} />
+          <CobblerFigure pose={pose} mood={mood} override={override} />
         </Animated.View>
-      </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -79,5 +157,15 @@ const styles = StyleSheet.create({
     borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10,
   },
   bubbleText: { fontSize: 15, color: '#111', lineHeight: 22 },
+  bubbleDot: {
+    backgroundColor: '#fff', borderWidth: 3, borderColor: '#111', borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 2,
+  },
+  bubbleDotText: { fontSize: 16, fontWeight: '700', color: '#111' },
   zzz: { fontSize: 22, fontWeight: '700', color: '#111', opacity: 0.6 },
+  fireworksLayer: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', zIndex: 5,
+  },
+  particle: { position: 'absolute' },
 });
