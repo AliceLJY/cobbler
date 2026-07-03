@@ -33,7 +33,7 @@ export function CardDrawer({ state, todayCard, cards }: {
     <View style={[styles.drawer, open && styles.drawerOpen]}>
       <Pressable onPress={() => setOpen((v) => !v)} style={styles.handleRow}>
         <Text style={styles.handleText} numberOfLines={1}>
-          {open ? '▾ 收起' : `▴ ${todayCard ? todayCard.title : '今天没有卡'}`}
+          {open ? '▾ 收起' : `▴ ${todayCard ? todayCard.title : '她还在巢里翻箱倒柜……过会儿再来'}`}
         </Text>
         {!open && newDiary.length > 0 && <View style={styles.dot} />}
       </Pressable>

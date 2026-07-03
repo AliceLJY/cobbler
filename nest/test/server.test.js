@@ -42,3 +42,20 @@ test('未知路由 404 JSON', async () => {
   assert.equal(r.status, 404);
   assert.ok((await r.json()).error);
 });
+
+test('今日卡缺失触发 onMissingToday 惰性补跑(且不重入)', async () => {
+  const dir2 = await mkdtemp(join(tmpdir(), 'srv2-'));
+  let calls = 0;
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const srv2 = createServer({ dataDir: dir2, onMissingToday: () => { calls += 1; return gate; } });
+  await new Promise((r) => srv2.listen(0, '127.0.0.1', r));
+  const b2 = `http://127.0.0.1:${srv2.address().port}`;
+  const r1 = await fetch(`${b2}/api/card/today`);
+  assert.equal(r1.status, 404);
+  assert.equal((await r1.json()).generating, true);
+  await fetch(`${b2}/api/card/today`); // 第二次请求:补跑仍在进行,不重入
+  assert.equal(calls, 1);
+  release();
+  srv2.close();
+});

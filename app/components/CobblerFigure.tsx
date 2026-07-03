@@ -12,11 +12,15 @@ const FACES: Record<string, { eyes: string; mouth: string }> = {
   sleeping: { eyes: '—   —', mouth: ' ' },
   bouncing: { eyes: '^   ^', mouth: '▿' },
   dizzy: { eyes: '×   ×', mouth: '~' },
+  touched: { eyes: 'o   o', mouth: 'o' },   // 被摸到:惊讶
+  party: { eyes: '＾   ＾', mouth: '▿' },   // 烟花中:大开心
 };
 
-export function CobblerFigure({ pose, mood }: { pose: Pose; mood: Mood | null }) {
-  // 即时行为优先;idle 时显示巢基调心情
-  const key = pose === 'idle' ? (mood ?? 'idle') : pose;
+export type FaceOverride = 'touched' | 'party' | null;
+
+export function CobblerFigure({ pose, mood, override }: { pose: Pose; mood: Mood | null; override?: FaceOverride }) {
+  // 优先级:触摸即时反应 > 传感器即时行为 > 巢基调心情
+  const key = override ?? (pose === 'idle' ? (mood ?? 'idle') : pose);
   const face = FACES[key] ?? FACES.idle;
   return (
     <View style={styles.wrap}>
