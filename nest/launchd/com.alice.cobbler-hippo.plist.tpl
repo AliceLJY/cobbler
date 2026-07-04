@@ -13,11 +13,10 @@
   <key>WorkingDirectory</key><string>__HOME__/Projects/cobbler/nest</string>
   <key>StandardOutPath</key><string>__HOME__/Projects/cobbler/nest/data/hippo.log</string>
   <key>StandardErrorPath</key><string>__HOME__/Projects/cobbler/nest/data/hippo.log</string>
+  <!-- mini 走 Clash Mi TUN 直连(2026-07-05 实测),不需要代理 env;若将来 TG 发送超时,先查代理模式是否变回端口代理 -->
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key><string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-    <key>NODE_USE_ENV_PROXY</key><string>1</string>
-    <key>HTTPS_PROXY</key><string>http://127.0.0.1:7890</string>
   </dict>
 </dict>
 </plist>
