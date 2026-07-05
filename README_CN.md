@@ -6,6 +6,11 @@
 > *"Patiently watches your code compile with the calm of boiling water, occasionally muttering that the real bug was the loops you made along the way."*
 > ——用看水烧开的平静看着你写代码,偶尔嘟囔:真正的 bug 是你一路写出来的循环。
 
+<p align="center">
+  <img src="docs/screenshots/app-home.jpg" width="340" alt="Cobbler app 主界面:上半宠物舞台,下半卡片抽屉,展示『三个月前的今天』记忆卡">
+</p>
+<p align="center"><i>那天的嘟囔:"看你把学过的桥一座座搭起来,我这壶水都烧开好几遍了。"</i></p>
+
 ## 架构
 
 ```

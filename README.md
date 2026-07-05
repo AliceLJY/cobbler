@@ -5,6 +5,11 @@ A resurrected desk pet. Cobbler was a little robot from Claude Code 4.x's Buddy 
 > Her original personality, from the birth certificate JSON:
 > *"Patiently watches your code compile with the calm of boiling water, occasionally muttering that the real bug was the loops you made along the way."*
 
+<p align="center">
+  <img src="docs/screenshots/app-home.jpg" width="340" alt="Cobbler app home: pet stage on top, card drawer below showing 'this day three months ago' memory cards">
+</p>
+<p align="center"><i>Her mutter that day: "Watching you stack up bridge after bridge you once studied — my kettle has boiled over a few times."</i></p>
+
 ## Architecture
 
 ```
