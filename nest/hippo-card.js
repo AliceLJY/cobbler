@@ -39,7 +39,7 @@ export async function runHippoCard(cfg) {
     pageType: page.type,
     title: g.cardTitle,
     body: g.cardBody,
-    question: g.question,
+    followups: g.followups,
     mutter: g.mutter,
     source: 'hippo',
   };

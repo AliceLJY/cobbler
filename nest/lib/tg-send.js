@@ -30,8 +30,21 @@ export function formatHippoCardText(card, dateISO) {
     '',
     card.body,
     '',
-    card.question,
-    '',
     `—— ${card.mutter}`,
+    '',
+    '想深挖?回我一下,我把问题条子写好,你拿去问隔壁大个子。',
+  ].join('\n');
+}
+
+export function formatFollowupText(card, hippoDirDisplay = '~/Projects/河马项目/hippo-wiki') {
+  const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
+  return [
+    '条子拿好,整段复制,发给隔壁随便哪个大个子:',
+    '',
+    `请读 ${hippoDirDisplay}/wiki/${card.pageFile},给我讲透这页「${card.pageTitle}」,重点回答:`,
+    qs,
+    '结合我现在的项目说,别泛泛。',
+    '',
+    `—— 我只管叼书,讲课是它们的事。`,
   ].join('\n');
 }
