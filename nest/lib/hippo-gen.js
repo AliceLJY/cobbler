@@ -11,16 +11,16 @@ export function buildHippoPrompt({ persona, page }) {
     persona,
     '',
     '今晚是"知识扭蛋"时间:Alice 的研究库 hippo-wiki 里存着几百页她读过、研究过的东西,',
-    '你每晚从书堆里叼一页出来,讲给她听,再考她一下。',
+    '你每晚从书堆里叼一页出来,用简单的话讲给她听——不考试,就是让她重逢一下。',
     `今晚叼到的一页:「${page.title}」(${page.type}${when})`,
     `这页的摘要:${page.summary}`,
     '',
     '请写:',
     '- cardTitle: 一句点名这页讲的是什么(≤30字)',
-    '- cardBody: 用你自己的话把它讲回来给她听,一两句就够,落点克制(≤100字)',
-    '- question: 考她一个小问题,让她回忆或者往自己的项目上联想(≤40字)',
+    '- cardBody: 简单介绍:它是什么、当时为什么值得她研究,用你自己的话讲,克制但讲清(≤140字)',
+    '- followups: 数组,恰好 2 条。如果她想深挖,值得拿去问"隔壁大 bot"的具体问题(每条≤50字,要具体到这页的内容,别泛泛)',
     '- mutter: 你的一句嘟囔(≤40字)',
-    '只输出一个 JSON 对象:{"cardTitle":"...","cardBody":"...","question":"...","mutter":"..."}',
+    '只输出一个 JSON 对象:{"cardTitle":"...","cardBody":"...","followups":["...","..."],"mutter":"..."}',
   ].join('\n');
 }
 
@@ -39,21 +39,21 @@ export async function generateHippoCard(input, opts = {}) {
     raw = parseClaudeJSON(stdout);
   } catch { return null; }
   if (!raw) return null;
-  for (const k of ['cardTitle', 'cardBody', 'question', 'mutter']) {
+  for (const k of ['cardTitle', 'cardBody', 'mutter']) {
     if (typeof raw[k] !== 'string' || !raw[k]) return null;
   }
+  if (!Array.isArray(raw.followups) || raw.followups.length < 1 || raw.followups.some((f) => typeof f !== 'string' || !f)) return null;
   return {
     cardTitle: truncate(raw.cardTitle, 30),
-    cardBody: truncate(raw.cardBody, 100),
-    question: truncate(raw.question, 40),
+    cardBody: truncate(raw.cardBody, 140),
+    followups: raw.followups.slice(0, 2).map((f) => truncate(f, 50)),
     mutter: truncate(raw.mutter, 40),
   };
 }
 
-const FALLBACK_QUESTIONS = [
-  '这个你现在还能讲出个大概吗。',
-  '它当时解决的是什么问题,还记得吗。',
-  '要是现在的项目用得上它,会用在哪。',
+const FALLBACK_FOLLOWUPS = [
+  '这页的核心判断放到今天还成立吗,依据是什么',
+  '这个东西和我现在的项目有哪些能接上的点',
 ];
 
 const FALLBACK_MUTTERS = [
@@ -66,8 +66,8 @@ export function fallbackHippoCard(page, rng = Math.random) {
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
   return {
     cardTitle: truncate(page.title, 30),
-    cardBody: truncate(page.summary, 100),
-    question: pick(FALLBACK_QUESTIONS),
+    cardBody: truncate(page.summary, 140),
+    followups: [...FALLBACK_FOLLOWUPS],
     mutter: pick(FALLBACK_MUTTERS),
   };
 }
