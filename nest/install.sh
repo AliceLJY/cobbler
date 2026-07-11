@@ -3,7 +3,7 @@ set -euo pipefail
 NODE_BIN="$(command -v node)"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$DIR/data"
-for name in com.alice.cobbler-nest com.alice.cobbler-api com.alice.cobbler-hippo com.alice.cobbler-hippo-listen com.alice.cobbler-museum; do
+for name in com.alice.cobbler-nest com.alice.cobbler-api com.alice.cobbler-hippo com.alice.cobbler-hippo-listen com.alice.cobbler-museum com.alice.cobbler-book; do
   sed -e "s|__HOME__|$HOME|g" -e "s|__NODE__|$NODE_BIN|g" \
     "$DIR/launchd/$name.plist.tpl" > "$HOME/Library/LaunchAgents/$name.plist"
   chmod 644 "$HOME/Library/LaunchAgents/$name.plist"

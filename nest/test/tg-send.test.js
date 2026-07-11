@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sendTelegramMessage, sendTelegramPhoto, formatHippoCardText, formatFollowupText, formatMuseumCaption, formatMuseumFollowupText } from '../lib/tg-send.js';
+import { sendTelegramMessage, sendTelegramPhoto, formatHippoCardText, formatFollowupText, formatMuseumCaption, formatMuseumFollowupText, formatBookCardText, formatBookFollowupText } from '../lib/tg-send.js';
 
 const ok = { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 1 } }) };
 const bad = { ok: false, status: 502, json: async () => ({ ok: false, description: 'bad gateway' }) };
@@ -98,4 +98,30 @@ test('formatMuseumFollowupText 条子带馆藏页链接和问题,不带 wiki 路
 test('formatMuseumFollowupText 兼容首日 artic 旧卡(articUrl)', () => {
   const t = formatMuseumFollowupText({ ...MCARD, museumUrl: undefined, articUrl: 'https://www.artic.edu/artworks/1' });
   assert.ok(t.includes('artic.edu/artworks/1'));
+});
+
+const BCARD = {
+  bookTitle: '倦怠社会', bookAuthor: '韩炳哲', bookDir: 'd1-hash', body: 'B', mutter: 'M',
+  quote: '过度的积极性是病灶', followups: ['F1', 'F2'],
+};
+
+test('formatBookCardText 含书名/作者/引文/嘟囔,不含 followups', () => {
+  const t = formatBookCardText(BCARD, '2026-07-11');
+  assert.ok(t.startsWith('📖 书堆扭蛋 · 7月11日'));
+  assert.ok(t.includes('《倦怠社会 · 韩炳哲》'));
+  assert.ok(t.includes('"过度的积极性是病灶"'));
+  assert.ok(t.includes('—— M') && t.includes('回我一下'));
+  assert.ok(!t.includes('F1'));
+});
+
+test('formatBookCardText 无 quote 不留引文行', () => {
+  const t = formatBookCardText({ ...BCARD, quote: null }, '2026-07-11');
+  assert.ok(!t.includes('"') || !t.includes('\n\n\n'));
+});
+
+test('formatBookFollowupText 条子带 FULL.md 路径+grep 引文锚', () => {
+  const t = formatBookFollowupText(BCARD);
+  assert.ok(t.includes('cc-ingested/d1-hash/FULL.md'));
+  assert.ok(t.includes('grep 引文"过度的积极性是病灶'));
+  assert.ok(t.includes('1. F1') && t.includes('2. F2'));
 });

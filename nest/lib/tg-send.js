@@ -77,6 +77,37 @@ export function formatMuseumCaption(card, dateISO) {
   ].join('\n');
 }
 
+export function formatBookCardText(card, dateISO) {
+  const [, m, d] = dateISO.split('-');
+  const byline = [truncate(card.bookTitle, 40), card.bookAuthor].filter(Boolean).join(' · ');
+  return [
+    `📖 书堆扭蛋 · ${Number(m)}月${Number(d)}日`,
+    '',
+    `《${byline}》`,
+    '',
+    card.body,
+    ...(card.quote ? ['', `"${card.quote}"`] : []),
+    '',
+    `—— ${card.mutter}`,
+    '',
+    '想深挖?回我一下,我把问题条子写好,你拿去问隔壁大个子。',
+  ].join('\n');
+}
+
+export function formatBookFollowupText(card, ebooksDisplay = '~/Downloads/hermes-shared/ebooks/cc-ingested') {
+  const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
+  const anchor = card.quote ? `,先 grep 引文"${card.quote.slice(0, 15)}"定位到我讲的那段` : '';
+  return [
+    '条子拿好,整段复制,发给隔壁随便哪个大个子:',
+    '',
+    `请读 ${ebooksDisplay}/${card.bookDir}/FULL.md(书:《${card.bookTitle}》)${anchor},重点回答:`,
+    qs,
+    '结合上下文讲,别泛泛。',
+    '',
+    `—— 我只管叼书,讲课是它们的事。`,
+  ].join('\n');
+}
+
 export function formatMuseumFollowupText(card) {
   const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
   const url = card.museumUrl ?? card.articUrl; // articUrl 兼容首日 artic 格式旧卡
