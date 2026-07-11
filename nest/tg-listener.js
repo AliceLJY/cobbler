@@ -1,26 +1,42 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
-import { sendTelegramMessage, formatFollowupText } from './lib/tg-send.js';
+import { sendTelegramMessage, formatFollowupText, formatMuseumFollowupText } from './lib/tg-send.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function latestHippoCard(dataDir) {
+async function latestIn(dataDir, sub) {
   let names = [];
-  try { names = await readdir(join(dataDir, 'hippo-cards')); } catch { return null; }
+  try { names = await readdir(join(dataDir, sub)); } catch { return null; }
   const latest = names.filter((n) => n.endsWith('.json')).sort().pop();
   if (!latest) return null;
-  return readJSON(join(dataDir, 'hippo-cards', latest), null);
+  const file = join(dataDir, sub, latest);
+  let mtimeMs = 0;
+  try { mtimeMs = (await stat(file)).mtimeMs; } catch { /* keep 0 */ }
+  return { file, date: latest.replace(/\.json$/, ''), mtimeMs };
+}
+
+export async function latestHippoCard(dataDir) {
+  const hit = await latestIn(dataDir, 'hippo-cards');
+  return hit ? readJSON(hit.file, null) : null;
+}
+
+// 两条扭蛋管线里取"最新投喂"的一张:先比日期,同日比 mtime(museum 08:30 早于 hippo 21:00)
+export async function latestCard(dataDir) {
+  const cands = (await Promise.all([latestIn(dataDir, 'hippo-cards'), latestIn(dataDir, 'museum-cards')])).filter(Boolean);
+  if (!cands.length) return null;
+  cands.sort((a, b) => (a.date === b.date ? a.mtimeMs - b.mtimeMs : a.date < b.date ? -1 : 1));
+  return readJSON(cands[cands.length - 1].file, null);
 }
 
 // 纯逻辑:一条 update 进来,决定回什么(null = 不理)
 export async function handleUpdate(update, { chatId, dataDir }) {
   const msg = update?.message;
   if (!msg?.text || msg.chat?.id !== chatId) return null;
-  const card = await latestHippoCard(dataDir);
+  const card = await latestCard(dataDir);
   if (!card) return '今晚还没开张。九点,老位置。';
-  return formatFollowupText(card);
+  return card.source === 'museum' ? formatMuseumFollowupText(card) : formatFollowupText(card);
 }
 
 export async function pollLoop(cfg) {

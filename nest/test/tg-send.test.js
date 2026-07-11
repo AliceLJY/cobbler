@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sendTelegramMessage, formatHippoCardText, formatFollowupText } from '../lib/tg-send.js';
+import { sendTelegramMessage, sendTelegramPhoto, formatHippoCardText, formatFollowupText, formatMuseumCaption, formatMuseumFollowupText } from '../lib/tg-send.js';
 
 const ok = { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 1 } }) };
 const bad = { ok: false, status: 502, json: async () => ({ ok: false, description: 'bad gateway' }) };
@@ -46,4 +46,51 @@ test('formatFollowupText 条子含页面路径和两个问题', () => {
   assert.ok(text.includes('wiki/entities/MediaPipe.md'));
   assert.ok(text.includes('1. F1') && text.includes('2. F2'));
   assert.ok(text.includes('「MediaPipe」'));
+});
+
+test('sendTelegramPhoto 打 sendPhoto 端点,带 photo+caption', async () => {
+  let captured;
+  const fetchImpl = async (url, init) => { captured = { url, body: JSON.parse(init.body) }; return ok; };
+  const r = await sendTelegramPhoto({ token: 't', chatId: 1, photo: 'https://img', caption: 'C' }, { fetchImpl });
+  assert.equal(r.message_id, 1);
+  assert.ok(captured.url.endsWith('/sendPhoto'));
+  assert.equal(captured.body.photo, 'https://img');
+  assert.equal(captured.body.caption, 'C');
+  assert.equal(captured.body.chat_id, 1);
+});
+
+test('sendTelegramPhoto 失败重试 + 缺 token throw', async () => {
+  let calls = 0;
+  const fetchImpl = async () => (++calls < 2 ? bad : ok);
+  await sendTelegramPhoto({ token: 't', chatId: 1, photo: 'p' }, { fetchImpl, baseDelayMs: 1 });
+  assert.equal(calls, 2);
+  await assert.rejects(sendTelegramPhoto({ token: '', chatId: 1, photo: 'p' }), /missing token/);
+});
+
+const MCARD = {
+  artworkTitle: '睡莲', artist: '莫奈', dateDisplay: '1906', body: 'B', mutter: 'M',
+  followups: ['F1', 'F2'], articUrl: 'https://www.artic.edu/artworks/16568',
+};
+
+test('formatMuseumCaption 含标题/作者行/嘟囔/回我提示,不含 followups,不超 TG 上限', () => {
+  const t = formatMuseumCaption(MCARD, '2026-07-11');
+  assert.ok(t.startsWith('🖼️ 美术馆扭蛋 · 7月11日'));
+  assert.ok(t.includes('「睡莲」'));
+  assert.ok(t.includes('莫奈 · 1906'));
+  assert.ok(t.includes('—— M') && t.includes('回我一下'));
+  assert.ok(!t.includes('F1'));
+  assert.ok(t.length <= 1024);
+});
+
+test('formatMuseumCaption 无作者/年代时不留空行', () => {
+  const t = formatMuseumCaption({ ...MCARD, artist: null, dateDisplay: null }, '2026-07-11');
+  assert.ok(!t.includes('\n\n\n'));
+});
+
+test('formatMuseumFollowupText 条子带馆藏页链接和问题,不带 wiki 路径', () => {
+  const t = formatMuseumFollowupText(MCARD);
+  assert.ok(t.includes('https://www.artic.edu/artworks/16568'));
+  assert.ok(t.includes('1. F1') && t.includes('2. F2'));
+  assert.ok(t.includes('「睡莲」') && t.includes('莫奈'));
+  assert.ok(!t.includes('wiki/'));
 });
