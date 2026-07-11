@@ -79,10 +79,11 @@ export function formatMuseumCaption(card, dateISO) {
 
 export function formatMuseumFollowupText(card) {
   const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
+  const url = card.museumUrl ?? card.articUrl; // articUrl 兼容首日 artic 格式旧卡
   return [
     '条子拿好,整段复制,发给隔壁随便哪个大个子:',
     '',
-    `请查一查「${card.artworkTitle}」(${card.artist || '佚名'}),馆藏页 ${card.articUrl},重点回答:`,
+    `请查一查「${card.artworkTitle}」(${card.artist || '佚名'}),馆藏页 ${url},重点回答:`,
     qs,
     '顺带讲讲这件作品值得知道的背景,别泛泛。',
     '',

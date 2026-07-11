@@ -8,7 +8,7 @@ import { handleUpdate, latestHippoCard, latestCard } from '../tg-listener.js';
 const CARD = { date: '2026-07-05', pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md', followups: ['F1', 'F2'], mutter: 'M' };
 const MUSEUM_CARD = {
   date: '2026-07-05', source: 'museum', artworkTitle: '睡莲', artist: '莫奈',
-  articUrl: 'https://www.artic.edu/artworks/1', followups: ['MF1', 'MF2'], mutter: 'M',
+  museumUrl: 'https://www.metmuseum.org/art/collection/search/1', followups: ['MF1', 'MF2'], mutter: 'M',
 };
 
 async function withDataDir(cards, fn) {
@@ -58,7 +58,7 @@ test('museum 卡日期更新 → latestCard 选它,回 museum 条子(带馆藏�
     const c = await latestCard(dir);
     assert.equal(c.source, 'museum');
     const r = await handleUpdate({ message: { text: 'q', chat: { id: 1 } } }, { chatId: 1, dataDir: dir });
-    assert.ok(r.includes('artworks/1') && r.includes('1. MF1'));
+    assert.ok(r.includes('collection/search/1') && r.includes('1. MF1'));
     assert.ok(!r.includes('wiki/'));
   });
 });

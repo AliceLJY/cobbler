@@ -5,12 +5,13 @@ import { buildMuseumPrompt, generateMuseumCard, fallbackMuseumCard, cleanDisplay
 const artwork = {
   id: 16568,
   title: 'Water Lilies',
-  artist_display: 'Claude Monet\nFrench, 1840–1926',
-  date_display: '1906',
-  medium_display: 'Oil on canvas',
-  place_of_origin: 'France',
+  artist: 'Claude Monet · French, 1840–1926',
+  dateDisplay: '1906',
+  medium: 'Oil on canvas',
+  origin: 'France',
   color: { h: 205, s: 30, l: 60 },
-  image_id: 'img-1',
+  imageUrl: 'https://images.metmuseum.org/web-large/x.jpg',
+  museumUrl: 'https://www.metmuseum.org/art/collection/search/16568',
 };
 const input = { persona: 'P', artwork };
 
@@ -19,7 +20,7 @@ test('cleanDisplay 压换行为分隔点', () => {
   assert.equal(cleanDisplay(null), '');
 });
 
-test('buildMuseumPrompt 含标题、作者(压行)、年代、主色 hsl、followups 要求', () => {
+test('buildMuseumPrompt 含标题、作者、年代、主色 hsl、followups 要求', () => {
   const p = buildMuseumPrompt(input);
   assert.ok(p.includes('「Water Lilies」'));
   assert.ok(p.includes('Claude Monet · French, 1840–1926'));
@@ -61,4 +62,9 @@ test('fallbackMuseumCard 用馆藏元数据拼身,自带 followups,永不空手'
   assert.ok(c.cardBody.includes('Claude Monet') && c.cardBody.includes('1906'));
   assert.equal(c.followups.length, 2);
   assert.ok(c.mutter);
+});
+
+test('fallbackMuseumCard 无作者 → 佚名', () => {
+  const c = fallbackMuseumCard({ title: 'X', dateDisplay: '約1200' }, () => 0);
+  assert.ok(c.cardBody.includes('佚名'));
 });

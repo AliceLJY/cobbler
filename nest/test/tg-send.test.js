@@ -69,7 +69,7 @@ test('sendTelegramPhoto 失败重试 + 缺 token throw', async () => {
 
 const MCARD = {
   artworkTitle: '睡莲', artist: '莫奈', dateDisplay: '1906', body: 'B', mutter: 'M',
-  followups: ['F1', 'F2'], articUrl: 'https://www.artic.edu/artworks/16568',
+  followups: ['F1', 'F2'], museumUrl: 'https://www.metmuseum.org/art/collection/search/16568',
 };
 
 test('formatMuseumCaption 含标题/作者行/嘟囔/回我提示,不含 followups,不超 TG 上限', () => {
@@ -89,8 +89,13 @@ test('formatMuseumCaption 无作者/年代时不留空行', () => {
 
 test('formatMuseumFollowupText 条子带馆藏页链接和问题,不带 wiki 路径', () => {
   const t = formatMuseumFollowupText(MCARD);
-  assert.ok(t.includes('https://www.artic.edu/artworks/16568'));
+  assert.ok(t.includes('https://www.metmuseum.org/art/collection/search/16568'));
   assert.ok(t.includes('1. F1') && t.includes('2. F2'));
   assert.ok(t.includes('「睡莲」') && t.includes('莫奈'));
   assert.ok(!t.includes('wiki/'));
+});
+
+test('formatMuseumFollowupText 兼容首日 artic 旧卡(articUrl)', () => {
+  const t = formatMuseumFollowupText({ ...MCARD, museumUrl: undefined, articUrl: 'https://www.artic.edu/artworks/1' });
+  assert.ok(t.includes('artic.edu/artworks/1'));
 });
