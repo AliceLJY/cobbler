@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pickMuseumArtwork, museumImageUrl } from './lib/museum-pick.js';
-import { generateMuseumCard, fallbackMuseumCard, cleanDisplay } from './lib/museum-gen.js';
+import { pickMuseumArtwork } from './lib/museum-pick.js';
+import { generateMuseumCard, fallbackMuseumCard } from './lib/museum-gen.js';
 import { sendTelegramMessage, sendTelegramPhoto, formatMuseumCaption } from './lib/tg-send.js';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
 import { localDateISO } from './lib/dates.js';
@@ -27,11 +27,11 @@ export async function runMuseumCard(cfg) {
     date: todayISO,
     artworkId: artwork.id,
     artworkTitle: artwork.title,
-    artist: cleanDisplay(artwork.artist_display) || null,
-    dateDisplay: artwork.date_display ?? null,
-    color: artwork.color ?? null,
-    imageUrl: museumImageUrl(artwork.image_id),
-    articUrl: `https://www.artic.edu/artworks/${artwork.id}`,
+    artist: artwork.artist,
+    dateDisplay: artwork.dateDisplay,
+    color: artwork.color,
+    imageUrl: artwork.imageUrl,
+    museumUrl: artwork.museumUrl,
     title: g.cardTitle,
     body: g.cardBody,
     followups: g.followups,

@@ -9,17 +9,17 @@ const pexec = promisify(execFile);
 export const cleanDisplay = (s) => (s ?? '').replace(/\s*\n\s*/g, ' · ').trim();
 
 export function buildMuseumPrompt({ persona, artwork }) {
-  const who = cleanDisplay(artwork.artist_display) || '佚名';
+  const who = artwork.artist || '佚名';
   const lines = [
     persona,
     '',
-    '今早是"美术馆扭蛋"时间:芝加哥艺术学院把几万件公版馆藏开放了出来,',
+    '今早是"美术馆扭蛋"时间:大都会艺术博物馆把几十万件公版馆藏开放了出来,',
     '你每天从里面叼一件回来,用简单的话讲给她听——不上课,就是让她睁眼看见一件好东西。',
     `今天叼到的一件:「${artwork.title}」`,
-    `作者:${who}${artwork.date_display ? `(${artwork.date_display})` : ''}`,
+    `作者:${who}${artwork.dateDisplay ? `(${artwork.dateDisplay})` : ''}`,
   ];
-  if (artwork.medium_display) lines.push(`材质:${artwork.medium_display}`);
-  if (artwork.place_of_origin) lines.push(`产地:${artwork.place_of_origin}`);
+  if (artwork.medium) lines.push(`材质:${artwork.medium}`);
+  if (artwork.origin) lines.push(`产地/文化:${artwork.origin}`);
   if (artwork.color) lines.push(`馆方标注的主色:hsl(${artwork.color.h}, ${artwork.color.s}%, ${artwork.color.l}%)`);
   lines.push(
     '',
@@ -73,8 +73,8 @@ const FALLBACK_MUTTERS = [
 
 export function fallbackMuseumCard(artwork, rng = Math.random) {
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
-  const who = cleanDisplay(artwork.artist_display) || '佚名';
-  const bits = [who, artwork.date_display, artwork.medium_display, artwork.place_of_origin].filter(Boolean);
+  const who = artwork.artist || '佚名';
+  const bits = [who, artwork.dateDisplay, artwork.medium, artwork.origin].filter(Boolean);
   return {
     cardTitle: truncate(artwork.title, 30),
     cardBody: truncate(bits.join(' · '), 140),
