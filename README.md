@@ -34,7 +34,7 @@ Mac mini (the nest)                      Android phone (the body)
 
 ```sh
 cd nest
-npm test                 # 36 tests, node:test, no deps
+npm test                 # 77 tests, node:test, no deps
 node generate.js         # run the daily pipeline once
 node server.js           # serve the API on 127.0.0.1:8790
 bash install.sh          # install both launchd services (daily 07:30 + keep-alive API)

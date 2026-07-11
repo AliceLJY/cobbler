@@ -1,24 +1,35 @@
+import { truncate } from './templates.js';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function sendTelegramMessage({ token, chatId, text }, opts = {}) {
+async function callTelegram({ token, method, body }, opts = {}) {
   const { fetchImpl = fetch, retries = 3, baseDelayMs = 2000, timeoutMs = 15000 } = opts;
-  if (!token || !chatId) throw new Error('tg-send: missing token/chatId');
   let lastErr;
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetchImpl(`https://api.telegram.org/bot${token}/sendMessage`, {
+      const res = await fetchImpl(`https://api.telegram.org/bot${token}/${method}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs),
       });
-      const body = await res.json().catch(() => ({}));
-      if (res.ok && body.ok) return body.result;
-      lastErr = new Error(`tg-send: api not ok (${res.status}) ${body.description ?? ''}`);
+      const resBody = await res.json().catch(() => ({}));
+      if (res.ok && resBody.ok) return resBody.result;
+      lastErr = new Error(`tg-send: api not ok (${res.status}) ${resBody.description ?? ''}`);
     } catch (e) { lastErr = e; }
     if (i < retries - 1) await sleep(baseDelayMs * 2 ** i);
   }
   throw lastErr;
+}
+
+export async function sendTelegramMessage({ token, chatId, text }, opts = {}) {
+  if (!token || !chatId) throw new Error('tg-send: missing token/chatId');
+  return callTelegram({ token, method: 'sendMessage', body: { chat_id: chatId, text } }, opts);
+}
+
+export async function sendTelegramPhoto({ token, chatId, photo, caption }, opts = {}) {
+  if (!token || !chatId) throw new Error('tg-send: missing token/chatId');
+  return callTelegram({ token, method: 'sendPhoto', body: { chat_id: chatId, photo, caption } }, opts);
 }
 
 export function formatHippoCardText(card, dateISO) {
@@ -46,5 +57,35 @@ export function formatFollowupText(card, hippoDirDisplay = '~/Projects/河马项
     '结合我现在的项目说,别泛泛。',
     '',
     `—— 我只管叼书,讲课是它们的事。`,
+  ].join('\n');
+}
+
+export function formatMuseumCaption(card, dateISO) {
+  const [, m, d] = dateISO.split('-');
+  const byline = [card.artist, card.dateDisplay].filter(Boolean).join(' · ');
+  return [
+    `🖼️ 美术馆扭蛋 · ${Number(m)}月${Number(d)}日`,
+    '',
+    `「${truncate(card.artworkTitle, 60)}」`,
+    ...(byline ? [byline] : []),
+    '',
+    card.body,
+    '',
+    `—— ${card.mutter}`,
+    '',
+    '想深挖?回我一下,我把问题条子写好,你拿去问隔壁大个子。',
+  ].join('\n');
+}
+
+export function formatMuseumFollowupText(card) {
+  const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
+  return [
+    '条子拿好,整段复制,发给隔壁随便哪个大个子:',
+    '',
+    `请查一查「${card.artworkTitle}」(${card.artist || '佚名'}),馆藏页 ${card.articUrl},重点回答:`,
+    qs,
+    '顺带讲讲这件作品值得知道的背景,别泛泛。',
+    '',
+    `—— 我只管叼画,讲课是它们的事。`,
   ].join('\n');
 }

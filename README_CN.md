@@ -32,7 +32,7 @@ Mac mini(巢)                            Android 手机(身体)
 
 ```sh
 cd nest
-npm test                 # 34 个测试,node:test,零依赖
+npm test                 # 77 个测试,node:test,零依赖
 node generate.js         # 手动跑一轮每日管线
 node server.js           # API 起在 127.0.0.1:8790
 bash install.sh          # 装两个 launchd 服务(每日 07:30 + 常驻 API)
