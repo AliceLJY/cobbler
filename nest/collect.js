@@ -8,14 +8,13 @@ import { diffDays, localDateISO } from './lib/dates.js';
 
 const pexec = promisify(execFile);
 
+async function gitConfig(key) {
+  try { return (await pexec('git', ['config', '--global', key])).stdout.trim(); } catch { return ''; }
+}
+
 async function gitIdentity() {
-  try {
-    const [email, name] = await Promise.all([
-      pexec('git', ['config', '--global', 'user.email']).then((r) => r.stdout.trim()),
-      pexec('git', ['config', '--global', 'user.name']).then((r) => r.stdout.trim()),
-    ]);
-    return email && name ? { email, name } : null;
-  } catch { return null; }
+  const [email, name] = await Promise.all([gitConfig('user.email'), gitConfig('user.name')]);
+  return email || name ? { email, name } : null;
 }
 
 export async function collect({ learningsDir, projectsDir, dataDir, todayISO, authors }) {

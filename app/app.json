@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cobbler",
     "slug": "cobbler",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,6 +26,16 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#FF5DA2",
+          "defaultChannel": "cobbler-daily"
+        }
+      ],
+      "expo-status-bar"
+    ],
     "extra": {
       "eas": {
         "projectId": "0e675788-9660-4e6c-8400-5dc9698ceab3"

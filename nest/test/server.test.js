@@ -30,6 +30,8 @@ test('GET /api/card/today 与 /api/cards', async () => {
   const cards = await (await fetch(`${base}/api/cards?limit=1`)).json();
   assert.equal(cards.length, 1);
   assert.equal(cards[0].title, 'T'); // 倒序:今天在前
+  const clamped = await (await fetch(`${base}/api/cards?limit=-5`)).json();
+  assert.equal(clamped.length, 1);
 });
 
 test('POST /api/heartbeat 落盘', async () => {

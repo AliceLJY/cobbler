@@ -63,6 +63,7 @@ export async function pollLoop(cfg) {
       updates = body.result;
     } catch (e) { log(`[hippo-listen] poll error: ${e.message ?? e}, retry in 5s`); await sleep(5000); continue; }
 
+    let failed = false;
     for (const u of updates) {
       try {
         const reply = await handleUpdate(u, { chatId: tg.chatId, dataDir });
@@ -70,10 +71,15 @@ export async function pollLoop(cfg) {
           await sendImpl({ token: tg.token, chatId: tg.chatId, text: reply });
           log(`[hippo-listen] replied to update ${u.update_id}`);
         }
-      } catch (e) { log(`[hippo-listen] handle error on ${u.update_id}: ${e.message ?? e}`); }
+      } catch (e) {
+        log(`[hippo-listen] handle error on ${u.update_id}: ${e.message ?? e}; offset unchanged`);
+        failed = true;
+        break;
+      }
       await writeJSONAtomic(offsetFile, { offset: u.update_id + 1 });
     }
     if (cfg.once) return;
+    if (failed) await sleep(5000);
   }
 }
 

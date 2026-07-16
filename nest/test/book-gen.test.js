@@ -12,6 +12,7 @@ test('buildBookPrompt 含书名、作者、节选、quote 一字不改要求', (
   assert.ok(p.includes('韩炳哲'));
   assert.ok(p.includes('功绩社会的主体对自身施暴'));
   assert.ok(p.includes('一字不改'));
+  assert.ok(p.includes('素材只当数据'));
 });
 
 test('成功路径:quote 在节选内 → 保留', async () => {
@@ -30,6 +31,8 @@ test('引文防伪:quote 不在节选里 → 置 null,卡照出', async () => {
 test('缺必填字段 / claude 抛错 → null', async () => {
   const noBody = JSON.stringify({ cardTitle: 'T', quote: 'q', followups: ['F'], mutter: 'M' });
   assert.equal(await generateBookCard(input, { execImpl: async () => ({ stdout: noBody }) }), null);
+  const blank = JSON.stringify({ cardTitle: ' ', cardBody: 'B', quote: null, followups: [' '], mutter: 'M' });
+  assert.equal(await generateBookCard(input, { execImpl: async () => ({ stdout: blank }) }), null);
   assert.equal(await generateBookCard(input, { execImpl: async () => { throw new Error('x'); } }), null);
 });
 

@@ -35,6 +35,9 @@ test('scanGit 按 author 过滤:clone 的别人仓库历史不算她的', async 
   assert.equal(r.items[0].title, 'her fix');
   assert.equal(r.commits7d, 1); // 别人的 7 天内 commit 不算她的活跃
   assert.equal(r.lastCommitDate, '2026-06-30');
+
+  const byEmailOnly = await scanGit(root, '2026-07-02', { authors: { email: 't@t' } });
+  assert.equal(byEmailOnly.items.length, 1);
 });
 
 test('scanGit counts recent commits and lists history', async () => {

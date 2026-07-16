@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { handleUpdate, latestHippoCard, latestCard } from '../tg-listener.js';
+import { handleUpdate, latestHippoCard, latestCard, pollLoop } from '../tg-listener.js';
+import { readJSON } from '../lib/store.js';
 
 const CARD = { date: '2026-07-05', pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md', followups: ['F1', 'F2'], mutter: 'M' };
 const MUSEUM_CARD = {
@@ -84,5 +85,31 @@ test('同日两张卡 → mtime 晚的胜(hippo 21:00 晚于 museum 08:30)', asy
     await writeFile(join(dir, 'hippo-cards', '2026-07-05.json'), JSON.stringify(CARD));
     const c = await latestCard(dir);
     assert.equal(c.pageTitle, 'MediaPipe');
+  });
+});
+
+test('pollLoop 仅在回复成功后推进 offset,发送失败留给下轮重试', async () => {
+  await withDataDir([CARD], async (dir) => {
+    await writeFile(join(dir, 'tg.json'), JSON.stringify({ token: 't', chatId: 1 }));
+    const update = { update_id: 7, message: { text: 'q', chat: { id: 1 } } };
+    const fetchImpl = async () => ({ json: async () => ({ ok: true, result: [update] }) });
+
+    await pollLoop({
+      dataDir: dir,
+      fetchImpl,
+      sendImpl: async () => { throw new Error('temporary outage'); },
+      log: () => {},
+      once: true,
+    });
+    assert.equal(await readJSON(join(dir, 'tg-offset.json'), null), null);
+
+    await pollLoop({
+      dataDir: dir,
+      fetchImpl,
+      sendImpl: async () => {},
+      log: () => {},
+      once: true,
+    });
+    assert.deepEqual(await readJSON(join(dir, 'tg-offset.json'), null), { offset: 8 });
   });
 });

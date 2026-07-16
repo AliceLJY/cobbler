@@ -13,7 +13,7 @@ async function listRepos(projectsDir) {
   for (const name of names) {
     try {
       const s = await stat(join(projectsDir, name, '.git'));
-      if (s.isDirectory()) repos.push(join(projectsDir, name));
+      if (s.isDirectory() || s.isFile()) repos.push(join(projectsDir, name));
     } catch { /* not a repo */ }
   }
   return repos;
@@ -36,7 +36,12 @@ function isHers(commit, authors) {
   if (!authors) return true; // 不传过滤器 = 不过滤
   const email = (commit.email ?? '').toLowerCase();
   const name = (commit.name ?? '').toLowerCase();
-  return email === authors.email.toLowerCase() || name === authors.name.toLowerCase();
+  const expectedEmail = (authors.email ?? '').toLowerCase();
+  const expectedName = (authors.name ?? '').toLowerCase();
+  return Boolean(
+    (expectedEmail && email === expectedEmail)
+    || (expectedName && name === expectedName),
+  );
 }
 
 export async function scanGit(projectsDir, todayISO, { authors } = {}) {
