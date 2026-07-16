@@ -1,4 +1,7 @@
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+
+const DAILY_CHANNEL_ID = 'cobbler-daily';
 
 // Cobbler 的通知句池——她每天早上的一声轻咳
 // 注意:不承诺"卡已备好"(巢可能睡过头,卡由 API 惰性补生成,点开即触发)
@@ -26,6 +29,14 @@ Notifications.setNotificationHandler({
 // 每次 app 打开时调用:请求权限并重排每日 8:00 的通知(巢 7:30 生成完半小时后)
 export async function ensureDailyNudge(): Promise<void> {
   try {
+    // Android 13 只有在 app 先创建通知频道后才会弹出通知权限请求。
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync(DAILY_CHANNEL_ID, {
+        name: 'Cobbler daily nudge',
+        description: 'Cobbler 每天早上的一声轻咳',
+        importance: Notifications.AndroidImportance.DEFAULT,
+      });
+    }
     const perm = await Notifications.requestPermissionsAsync();
     if (!perm.granted) return; // 她不想被打扰就算了,不纠缠
     await Notifications.cancelAllScheduledNotificationsAsync();
@@ -35,6 +46,7 @@ export async function ensureDailyNudge(): Promise<void> {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 8,
         minute: 0,
+        channelId: Platform.OS === 'android' ? DAILY_CHANNEL_ID : undefined,
       },
     });
   } catch {

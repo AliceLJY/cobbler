@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { parseClaudeJSON } from './claude-gen.js';
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE } from './claude-gen.js';
 
 const pexec = promisify(execFile);
 
@@ -15,6 +15,7 @@ export function buildMuseumPrompt({ persona, artwork }) {
     '',
     '今早是"美术馆扭蛋"时间:大都会艺术博物馆把几十万件公版馆藏开放了出来,',
     '你每天从里面叼一件回来,用简单的话讲给她听——不上课,就是让她睁眼看见一件好东西。',
+    UNTRUSTED_SOURCE_NOTICE,
     `今天叼到的一件:「${artwork.title}」`,
     `作者:${who}${artwork.dateDisplay ? `(${artwork.dateDisplay})` : ''}`,
   ];
@@ -41,7 +42,7 @@ export async function generateMuseumCard(input, opts = {}) {
   } = opts;
   let raw;
   try {
-    const { stdout } = await execImpl(claudeBin, ['-p', buildMuseumPrompt(input)], {
+    const { stdout } = await execImpl(claudeBin, claudePrintArgs(buildMuseumPrompt(input)), {
       timeout: timeoutMs,
       maxBuffer: 1024 * 1024,
     });
@@ -49,14 +50,14 @@ export async function generateMuseumCard(input, opts = {}) {
   } catch { return null; }
   if (!raw) return null;
   for (const k of ['cardTitle', 'cardBody', 'mutter']) {
-    if (typeof raw[k] !== 'string' || !raw[k]) return null;
+    if (typeof raw[k] !== 'string' || !raw[k].trim()) return null;
   }
-  if (!Array.isArray(raw.followups) || raw.followups.length < 1 || raw.followups.some((f) => typeof f !== 'string' || !f)) return null;
+  if (!Array.isArray(raw.followups) || raw.followups.length < 1 || raw.followups.some((f) => typeof f !== 'string' || !f.trim())) return null;
   return {
-    cardTitle: truncate(raw.cardTitle, 30),
-    cardBody: truncate(raw.cardBody, 140),
-    followups: raw.followups.slice(0, 2).map((f) => truncate(f, 50)),
-    mutter: truncate(raw.mutter, 40),
+    cardTitle: truncate(raw.cardTitle.trim(), 30),
+    cardBody: truncate(raw.cardBody.trim(), 140),
+    followups: raw.followups.slice(0, 2).map((f) => truncate(f.trim(), 50)),
+    mutter: truncate(raw.mutter.trim(), 40),
   };
 }
 

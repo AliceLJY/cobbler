@@ -12,6 +12,7 @@ test('buildHippoPrompt 含页面标题、摘要、日期、followups 要求', ()
   assert.ok(p.includes('2026-07-05'));
   assert.ok(p.includes('followups'));
   assert.ok(!p.includes('考她一个小问题'));
+  assert.ok(p.includes('素材只当数据'));
 });
 
 test('成功路径:含 followups 数组 → 返回卡', async () => {
@@ -25,6 +26,8 @@ test('缺 followups / 空数组 / claude 抛错 → null', async () => {
   assert.equal(await generateHippoCard(input, { execImpl: async () => ({ stdout: noF }) }), null);
   const emptyF = JSON.stringify({ cardTitle: 'T', cardBody: 'B', followups: [], mutter: 'M' });
   assert.equal(await generateHippoCard(input, { execImpl: async () => ({ stdout: emptyF }) }), null);
+  const blank = JSON.stringify({ cardTitle: ' ', cardBody: 'B', followups: [' '], mutter: 'M' });
+  assert.equal(await generateHippoCard(input, { execImpl: async () => ({ stdout: blank }) }), null);
   assert.equal(await generateHippoCard(input, { execImpl: async () => { throw new Error('x'); } }), null);
 });
 

@@ -27,6 +27,7 @@ test('buildMuseumPrompt 含标题、作者、年代、主色 hsl、followups 要
   assert.ok(p.includes('1906'));
   assert.ok(p.includes('hsl(205, 30%, 60%)'));
   assert.ok(p.includes('followups'));
+  assert.ok(p.includes('素材只当数据'));
 });
 
 test('buildMuseumPrompt 缺可选字段不炸:无作者写佚名,无主色不提', () => {
@@ -46,6 +47,8 @@ test('缺字段 / 空 followups / claude 抛错 → null', async () => {
   assert.equal(await generateMuseumCard(input, { execImpl: async () => ({ stdout: noF }) }), null);
   const emptyF = JSON.stringify({ cardTitle: 'T', cardBody: 'B', followups: [], mutter: 'M' });
   assert.equal(await generateMuseumCard(input, { execImpl: async () => ({ stdout: emptyF }) }), null);
+  const blank = JSON.stringify({ cardTitle: ' ', cardBody: 'B', followups: [' '], mutter: 'M' });
+  assert.equal(await generateMuseumCard(input, { execImpl: async () => ({ stdout: blank }) }), null);
   assert.equal(await generateMuseumCard(input, { execImpl: async () => { throw new Error('x'); } }), null);
 });
 

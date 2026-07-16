@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { parseClaudeJSON } from './claude-gen.js';
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE } from './claude-gen.js';
 
 const pexec = promisify(execFile);
 
@@ -11,6 +11,7 @@ export function buildBookPrompt({ persona, book, excerpt }) {
     '',
     '今天中午是"书堆扭蛋"时间:她攒了三百多本中外的书在库里,大多买了没读完。',
     '你每天从书堆里叼一本,翻到中间随便一段,讲给她听——不劝学,就是让她尝一口这本书的味道。',
+    UNTRUSTED_SOURCE_NOTICE,
     `今天叼到的一本:《${book.title}》${book.author ? `,作者 ${book.author}` : ''}`,
     '翻到的一段(节选,可能从半句开始):',
     '---',
@@ -35,7 +36,7 @@ export async function generateBookCard(input, opts = {}) {
   } = opts;
   let raw;
   try {
-    const { stdout } = await execImpl(claudeBin, ['-p', buildBookPrompt(input)], {
+    const { stdout } = await execImpl(claudeBin, claudePrintArgs(buildBookPrompt(input)), {
       timeout: timeoutMs,
       maxBuffer: 1024 * 1024,
     });
@@ -43,18 +44,18 @@ export async function generateBookCard(input, opts = {}) {
   } catch { return null; }
   if (!raw) return null;
   for (const k of ['cardTitle', 'cardBody', 'mutter']) {
-    if (typeof raw[k] !== 'string' || !raw[k]) return null;
+    if (typeof raw[k] !== 'string' || !raw[k].trim()) return null;
   }
-  if (!Array.isArray(raw.followups) || raw.followups.length < 1 || raw.followups.some((f) => typeof f !== 'string' || !f)) return null;
+  if (!Array.isArray(raw.followups) || raw.followups.length < 1 || raw.followups.some((f) => typeof f !== 'string' || !f.trim())) return null;
   // 引文防伪:quote 必须原样出现在节选里,不是就丢弃(卡照发,不带引文)
   let quote = typeof raw.quote === 'string' && raw.quote.trim() ? raw.quote.trim() : null;
   if (quote && !input.excerpt.includes(quote)) quote = null;
   return {
-    cardTitle: truncate(raw.cardTitle, 30),
-    cardBody: truncate(raw.cardBody, 140),
+    cardTitle: truncate(raw.cardTitle.trim(), 30),
+    cardBody: truncate(raw.cardBody.trim(), 140),
     quote: quote ? truncate(quote, 80) : null,
-    followups: raw.followups.slice(0, 2).map((f) => truncate(f, 50)),
-    mutter: truncate(raw.mutter, 40),
+    followups: raw.followups.slice(0, 2).map((f) => truncate(f.trim(), 50)),
+    mutter: truncate(raw.mutter.trim(), 40),
   };
 }
 

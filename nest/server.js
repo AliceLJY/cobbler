@@ -29,7 +29,8 @@ export function createServer({ dataDir, onMissingToday }) {
         return send(res, 404, { error: 'no card today', generating: true });
       }
       if (req.method === 'GET' && url.pathname === '/api/cards') {
-        const limit = Math.min(Number(url.searchParams.get('limit')) || 30, 100);
+        const requested = Number.parseInt(url.searchParams.get('limit') ?? '', 10);
+        const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 100) : 30;
         return send(res, 200, await listCards(dataDir, limit));
       }
       if (req.method === 'POST' && url.pathname === '/api/heartbeat') {

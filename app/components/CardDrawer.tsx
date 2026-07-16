@@ -41,7 +41,7 @@ export function CardDrawer({ state, todayCard, cards }: {
     // 展开抽屉视为"读到她攒的话"
     if (open && newDiary.length) {
       const latest = newDiary[newDiary.length - 1].date;
-      markDiarySeen(latest).catch(() => {});
+      markDiarySeen(latest).then(() => setLastSeen(latest)).catch(() => {});
     }
   }, [open, newDiary]);
 
