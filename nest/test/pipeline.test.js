@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runPipeline } from '../generate.js';
+import { collect } from '../collect.js';
 import { appendHeartbeat, listCards } from '../lib/store.js';
 
 async function fixture() {
@@ -18,6 +19,25 @@ async function fixture() {
   await writeFile(personaPath, 'PERSONA');
   return { learningsDir, projectsDir, dataDir, personaPath };
 }
+
+test('昨天的日历日判定不受宿主时区影响', async () => {
+  const previousTZ = process.env.TZ;
+  process.env.TZ = 'America/New_York';
+  try {
+    const f = await fixture();
+    await writeFile(join(f.learningsDir, '2026-07.md'),
+      '| 1 | 07-01 | 昨天的折腾 | 活动信号 | cat |\n');
+    const result = await collect({
+      ...f,
+      todayISO: '2026-07-02',
+      authors: { email: 'nobody@example.test', name: 'Nobody' },
+    });
+    assert.equal(result.signals.activityYesterday, true);
+  } finally {
+    if (previousTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTZ;
+  }
+});
 
 test('管线:claude 成功路径,state+card 落盘', async () => {
   const f = await fixture();
