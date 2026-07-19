@@ -49,19 +49,24 @@ export async function pickMuseumArtwork({ history = [], rng = Math.random, fetch
   const freshIds = ids.filter((id) => !seen.has(id));
   const pool = freshIds.length ? freshIds : ids; // 全撞历史放开重复,永不空手
   const remainingIds = [...new Set(pool)];
+  const retryableIds = [];
+  const errorsById = new Map();
 
-  let lastErr = null;
-  const attempts = Math.min(MAX_ID_TRIES, remainingIds.length);
-  for (let i = 0; i < attempts; i++) {
+  for (let i = 0; i < MAX_ID_TRIES && (remainingIds.length || retryableIds.length); i++) {
     if (i > 0) await sleep(retryDelayMs); // 失败换件时歇口气,别背靠背打
+    if (!remainingIds.length) remainingIds.push(...new Set(retryableIds.splice(0)));
     const [id] = remainingIds.splice(Math.floor(rng() * remainingIds.length), 1);
     try {
       const r = await fetchImpl(`${OBJECT_URL}/${id}`, { headers: HDRS, signal: AbortSignal.timeout(timeoutMs) });
       if (!r.ok) throw new Error(`met object ${r.status}`);
+      errorsById.delete(id);
       const norm = normalizeMetObject(await r.json());
       if (norm) return norm;
-    } catch (e) { lastErr = e; }
+    } catch (e) {
+      errorsById.set(id, e);
+      retryableIds.push(id);
+    }
   }
-  if (lastErr) throw lastErr;
+  if (errorsById.size) throw [...errorsById.values()].at(-1);
   return null;
 }

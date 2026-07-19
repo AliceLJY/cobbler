@@ -12,12 +12,13 @@ const HISTORY_LIMIT = 90;
 export async function runMuseumCard(cfg) {
   const { dataDir, personaPath, todayISO, rng = Math.random, fetchImpl = fetch } = cfg;
   const gen = cfg.museumGen ?? generateMuseumCard;
+  const pick = cfg.museumPick ?? pickMuseumArtwork;
   const sendPhoto = cfg.sendPhotoImpl ?? sendTelegramPhoto;
   const sendText = cfg.sendTextImpl ?? sendTelegramMessage;
 
   const historyFile = join(dataDir, 'museum-history.json');
   const history = await readJSON(historyFile, []);
-  const artwork = await pickMuseumArtwork({ history, rng, fetchImpl });
+  const artwork = await pick({ history, rng, fetchImpl });
   if (!artwork) throw new Error('museum-card: nothing to pick');
 
   const persona = await readFile(personaPath, 'utf8');

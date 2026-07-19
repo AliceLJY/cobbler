@@ -72,6 +72,47 @@ test('抽到无图对象 → 换 ID 重试拿到有图的', async () => {
   assert.deepEqual(objectCalls, [7, 8]);
 });
 
+test('单候选遇到临时错误 → 有限重试后成功', async () => {
+  let objectCalls = 0;
+  const fetchImpl = async (url) => {
+    if (url.includes('/search')) return { ok: true, json: async () => ({ objectIDs: [7] }) };
+    objectCalls++;
+    if (objectCalls === 1) return { ok: false, status: 502 };
+    return { ok: true, json: async () => MET_OBJ(7) };
+  };
+  const r = await pickMuseumArtwork({ rng: () => 0, fetchImpl, retryDelayMs: 1 });
+  assert.equal(r.id, 7);
+  assert.equal(objectCalls, 2);
+});
+
+test('所有候选都无图 → 每件只检查一次后返回 null', async () => {
+  const objectCalls = [];
+  const fetchImpl = async (url) => {
+    if (url.includes('/search')) return { ok: true, json: async () => ({ objectIDs: [7, 8] }) };
+    const id = Number(url.split('/').pop());
+    objectCalls.push(id);
+    return { ok: true, json: async () => MET_OBJ(id, { primaryImageSmall: '' }) };
+  };
+  const r = await pickMuseumArtwork({ rng: () => 0, fetchImpl, retryDelayMs: 1 });
+  assert.equal(r, null);
+  assert.deepEqual(objectCalls, [7, 8]);
+});
+
+test('大候选池请求失败 → 先换不同 ID,有限次数内不重复', async () => {
+  const ids = [1, 2, 3, 4, 5, 6, 7];
+  const objectCalls = [];
+  const fetchImpl = async (url) => {
+    if (url.includes('/search')) return { ok: true, json: async () => ({ objectIDs: ids }) };
+    objectCalls.push(Number(url.split('/').pop()));
+    return { ok: false, status: 502 };
+  };
+  await assert.rejects(
+    pickMuseumArtwork({ rng: () => 0, fetchImpl, retryDelayMs: 1 }),
+    /met object 502/,
+  );
+  assert.deepEqual(objectCalls, [1, 2, 3, 4, 5, 6]);
+});
+
 test('highlight 池 ≥30 → 用精品池,不再打全量', async () => {
   const highlightIds = Array.from({ length: 30 }, (_, i) => 100 + i);
   let fullSearchCalls = 0;
@@ -98,8 +139,12 @@ test('search 失败 → throw;object 持续失败 → throw', async () => {
     pickMuseumArtwork({ fetchImpl: async () => ({ ok: false, status: 502 }), rng: () => 0 }),
     /met search 502/,
   );
-  const fetchImpl = async (url) => (url.includes('/search')
-    ? { ok: true, json: async () => ({ objectIDs: [1] }) }
-    : { ok: false, status: 404 });
+  let objectCalls = 0;
+  const fetchImpl = async (url) => {
+    if (url.includes('/search')) return { ok: true, json: async () => ({ objectIDs: [1] }) };
+    objectCalls++;
+    return { ok: false, status: 404 };
+  };
   await assert.rejects(pickMuseumArtwork({ fetchImpl, rng: () => 0, retryDelayMs: 1 }), /met object 404/);
+  assert.equal(objectCalls, 6);
 });
