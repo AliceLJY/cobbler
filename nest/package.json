@@ -1,6 +1,7 @@
 {
   "name": "cobbler-nest",
   "version": "0.8.1",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": { "node": ">=20" },
