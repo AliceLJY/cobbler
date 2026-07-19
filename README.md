@@ -68,4 +68,4 @@ Personal toy, built for one user, shared as-is. Not affiliated with Anthropic; C
 
 ## License
 
-This repository currently has no repository-wide open-source license. `app/LICENSE` is the original Expo scaffold notice for Expo-owned material; it is not a license grant for Cobbler as a whole.
+Cobbler is licensed under the [MIT License](LICENSE). `app/LICENSE` preserves the original Expo scaffold notice for Expo-owned material.

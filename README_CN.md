@@ -68,4 +68,4 @@ Cobbler 自身没有账号、托管后端或遥测。原始历史留在 mini 上
 
 ## 许可
 
-本仓库目前没有覆盖全仓的开源许可证。`app/LICENSE` 是 Expo 脚手架保留的 Expo 权利声明,不等于 Cobbler 整体已经获得开源授权。
+Cobbler 采用 [MIT License](LICENSE)。`app/LICENSE` 保留 Expo 脚手架中 Expo 所有材料的原始权利声明。
