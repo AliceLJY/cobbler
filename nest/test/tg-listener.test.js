@@ -37,10 +37,18 @@ test('本人消息 → 回条子(含路径与问题)', async () => {
   });
 });
 
+test('chatId 配置为字符串时也能匹配 Telegram 数字 ID', async () => {
+  await withDataDir([CARD], async (dir) => {
+    const r = await handleUpdate({ message: { text: '想深挖', chat: { id: 123 } } }, { chatId: '123', dataDir: dir });
+    assert.ok(r.includes('entities/MediaPipe.md'));
+  });
+});
+
 test('陌生人 / 无文本 → 不理', async () => {
   await withDataDir([CARD], async (dir) => {
     assert.equal(await handleUpdate({ message: { text: 'hi', chat: { id: 999 } } }, { chatId: 8315648213, dataDir: dir }), null);
     assert.equal(await handleUpdate({ message: { chat: { id: 8315648213 } } }, { chatId: 8315648213, dataDir: dir }), null);
+    assert.equal(await handleUpdate({ message: { text: 'hi' } }, { chatId: 8315648213, dataDir: dir }), null);
     assert.equal(await handleUpdate({}, { chatId: 8315648213, dataDir: dir }), null);
   });
 });

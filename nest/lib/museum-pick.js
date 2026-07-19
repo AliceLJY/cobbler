@@ -48,11 +48,13 @@ export async function pickMuseumArtwork({ history = [], rng = Math.random, fetch
   const seen = new Set(history);
   const freshIds = ids.filter((id) => !seen.has(id));
   const pool = freshIds.length ? freshIds : ids; // 全撞历史放开重复,永不空手
+  const remainingIds = [...new Set(pool)];
 
   let lastErr = null;
-  for (let i = 0; i < MAX_ID_TRIES; i++) {
+  const attempts = Math.min(MAX_ID_TRIES, remainingIds.length);
+  for (let i = 0; i < attempts; i++) {
     if (i > 0) await sleep(retryDelayMs); // 失败换件时歇口气,别背靠背打
-    const id = pool[Math.floor(rng() * pool.length)];
+    const [id] = remainingIds.splice(Math.floor(rng() * remainingIds.length), 1);
     try {
       const r = await fetchImpl(`${OBJECT_URL}/${id}`, { headers: HDRS, signal: AbortSignal.timeout(timeoutMs) });
       if (!r.ok) throw new Error(`met object ${r.status}`);

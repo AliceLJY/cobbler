@@ -37,7 +37,8 @@ const FOLLOWUP_FORMATTERS = { museum: formatMuseumFollowupText, book: formatBook
 // 纯逻辑:一条 update 进来,决定回什么(null = 不理)
 export async function handleUpdate(update, { chatId, dataDir }) {
   const msg = update?.message;
-  if (!msg?.text || msg.chat?.id !== chatId) return null;
+  const incomingChatId = msg?.chat?.id;
+  if (!msg?.text || incomingChatId == null || chatId == null || String(incomingChatId) !== String(chatId)) return null;
   const card = await latestCard(dataDir);
   if (!card) return '今晚还没开张。九点,老位置。';
   return (FOLLOWUP_FORMATTERS[card.source] ?? formatFollowupText)(card);
