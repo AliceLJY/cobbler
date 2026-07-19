@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { loadLearnings } from './lib/parse-learnings.js';
 import { scanGit } from './lib/scan-git.js';
 import { readJSON } from './lib/store.js';
-import { diffDays, localDateISO } from './lib/dates.js';
+import { diffDays, localDateISO, previousDateISO } from './lib/dates.js';
 
 const pexec = promisify(execFile);
 
@@ -32,7 +32,7 @@ export async function collect({ learningsDir, projectsDir, dataDir, todayISO, au
     const d = diffDays(i.date, todayISO);
     return d >= 0 && d < 7;
   });
-  const yesterday = localDateISO(new Date(Date.parse(todayISO) - 86400000));
+  const yesterday = previousDateISO(todayISO);
   const activityYesterday =
     hbDates.includes(yesterday) ||
     learnings.some((i) => i.date === yesterday) ||

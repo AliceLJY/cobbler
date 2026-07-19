@@ -1,9 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { localDateISO, diffDays, relTime } from '../lib/dates.js';
+import { localDateISO, previousDateISO, diffDays, relTime } from '../lib/dates.js';
 
 test('localDateISO formats local date', () => {
   assert.equal(localDateISO(new Date(2026, 6, 2)), '2026-07-02');
+});
+
+test('previousDateISO uses calendar dates across month, year, and leap boundaries', () => {
+  assert.equal(previousDateISO('2026-07-02'), '2026-07-01');
+  assert.equal(previousDateISO('2026-01-01'), '2025-12-31');
+  assert.equal(previousDateISO('2024-03-01'), '2024-02-29');
 });
 
 test('diffDays counts whole days', () => {

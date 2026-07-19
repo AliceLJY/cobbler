@@ -60,15 +60,16 @@ test('全撞历史 → 放开重复,永不空手', async () => {
 });
 
 test('抽到无图对象 → 换 ID 重试拿到有图的', async () => {
-  let calls = 0;
+  const objectCalls = [];
   const fetchImpl = async (url) => {
-    if (url.includes('/search')) return { ok: true, json: async () => ({ objectIDs: [7] }) };
-    calls++;
-    return { ok: true, json: async () => (calls === 1 ? MET_OBJ(7, { primaryImageSmall: '' }) : MET_OBJ(7)) };
+    if (url.includes('/search')) return { ok: true, json: async () => ({ objectIDs: [7, 8] }) };
+    const id = Number(url.split('/').pop());
+    objectCalls.push(id);
+    return { ok: true, json: async () => (id === 7 ? MET_OBJ(7, { primaryImageSmall: '' }) : MET_OBJ(id)) };
   };
   const r = await pickMuseumArtwork({ rng: () => 0, fetchImpl, retryDelayMs: 1 });
-  assert.equal(r.id, 7);
-  assert.equal(calls, 2);
+  assert.equal(r.id, 8);
+  assert.deepEqual(objectCalls, [7, 8]);
 });
 
 test('highlight 池 ≥30 → 用精品池,不再打全量', async () => {

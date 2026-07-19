@@ -5,6 +5,12 @@ export function localDateISO(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
+export function previousDateISO(dateISO) {
+  const d = new Date(`${dateISO}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export function diffDays(fromISO, toISO) {
   return Math.round((Date.parse(toISO) - Date.parse(fromISO)) / 86400000);
 }
