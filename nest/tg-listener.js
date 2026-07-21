@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises';
+import { appendFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
@@ -33,6 +33,20 @@ export async function latestCard(dataDir) {
 }
 
 const FOLLOWUP_FORMATTERS = { museum: formatMuseumFollowupText, book: formatBookFollowupText };
+
+function isPermanentTelegramError(error) {
+  const status = Number(error?.telegramCode ?? error?.status);
+  return status >= 400 && status < 500 && status !== 429;
+}
+
+async function recordDeadLetter(dataDir, update, error) {
+  const entry = {
+    updateId: update.update_id,
+    failedAt: new Date().toISOString(),
+    error: String(error?.message ?? error),
+  };
+  await appendFile(join(dataDir, 'tg-dead-letter.jsonl'), `${JSON.stringify(entry)}\n`, { mode: 0o600 });
+}
 
 // 纯逻辑:一条 update 进来,决定回什么(null = 不理)
 export async function handleUpdate(update, { chatId, dataDir }) {
@@ -73,6 +87,12 @@ export async function pollLoop(cfg) {
           log(`[hippo-listen] replied to update ${u.update_id}`);
         }
       } catch (e) {
+        if (isPermanentTelegramError(e)) {
+          await recordDeadLetter(dataDir, u, e);
+          await writeJSONAtomic(offsetFile, { offset: u.update_id + 1 });
+          log(`[hippo-listen] permanent error on ${u.update_id}; recorded dead letter and advanced offset`);
+          continue;
+        }
         log(`[hippo-listen] handle error on ${u.update_id}: ${e.message ?? e}; offset unchanged`);
         failed = true;
         break;

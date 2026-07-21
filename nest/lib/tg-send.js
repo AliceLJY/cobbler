@@ -16,6 +16,8 @@ async function callTelegram({ token, method, body }, opts = {}) {
       const resBody = await res.json().catch(() => ({}));
       if (res.ok && resBody.ok) return resBody.result;
       lastErr = new Error(`tg-send: api not ok (${res.status}) ${resBody.description ?? ''}`);
+      lastErr.status = res.status;
+      lastErr.telegramCode = resBody.error_code;
     } catch (e) { lastErr = e; }
     if (i < retries - 1) await sleep(baseDelayMs * 2 ** i);
   }
