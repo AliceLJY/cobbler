@@ -121,3 +121,24 @@ test('pollLoop 仅在回复成功后推进 offset,发送失败留给下轮重试
     assert.deepEqual(await readJSON(join(dir, 'tg-offset.json'), null), { offset: 8 });
   });
 });
+
+test('永久 Telegram 4xx 写入死信并推进 offset', async () => {
+  await withDataDir([CARD], async (dir) => {
+    await writeFile(join(dir, 'tg.json'), JSON.stringify({ token: 't', chatId: 1 }));
+    const update = { update_id: 9, message: { text: 'q', chat: { id: 1 } } };
+    const error = Object.assign(new Error('bot was blocked by the user'), { status: 403 });
+
+    await pollLoop({
+      dataDir: dir,
+      fetchImpl: async () => ({ json: async () => ({ ok: true, result: [update] }) }),
+      sendImpl: async () => { throw error; },
+      log: () => {},
+      once: true,
+    });
+
+    assert.deepEqual(await readJSON(join(dir, 'tg-offset.json'), null), { offset: 10 });
+    const deadLetter = await import('node:fs/promises').then(({ readFile }) => readFile(join(dir, 'tg-dead-letter.jsonl'), 'utf8'));
+    assert.match(deadLetter, /\"updateId\":9/);
+    assert.match(deadLetter, /bot was blocked by the user/);
+  });
+});
