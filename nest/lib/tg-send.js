@@ -62,23 +62,6 @@ export function formatFollowupText(card, hippoDirDisplay = '~/Projects/河马项
   ].join('\n');
 }
 
-export function formatMuseumCaption(card, dateISO) {
-  const [, m, d] = dateISO.split('-');
-  const byline = [card.artist, card.dateDisplay].filter(Boolean).join(' · ');
-  return [
-    `🖼️ 美术馆扭蛋 · ${Number(m)}月${Number(d)}日`,
-    '',
-    `「${truncate(card.artworkTitle, 60)}」`,
-    ...(byline ? [byline] : []),
-    '',
-    card.body,
-    '',
-    `—— ${card.mutter}`,
-    '',
-    '想深挖?回我一下,我把问题条子写好,你拿去问隔壁大个子。',
-  ].join('\n');
-}
-
 export function formatBookCardText(card, dateISO) {
   const [, m, d] = dateISO.split('-');
   const byline = [truncate(card.bookTitle, 40), card.bookAuthor].filter(Boolean).join(' · ');
@@ -107,19 +90,5 @@ export function formatBookFollowupText(card, ebooksDisplay = '~/Downloads/hermes
     '结合上下文讲,别泛泛。',
     '',
     `—— 我只管叼书,讲课是它们的事。`,
-  ].join('\n');
-}
-
-export function formatMuseumFollowupText(card) {
-  const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
-  const url = card.museumUrl ?? card.articUrl; // articUrl 兼容首日 artic 格式旧卡
-  return [
-    '条子拿好,整段复制,发给隔壁随便哪个大个子:',
-    '',
-    `请查一查「${card.artworkTitle}」(${card.artist || '佚名'}),馆藏页 ${url},重点回答:`,
-    qs,
-    '顺带讲讲这件作品值得知道的背景,别泛泛。',
-    '',
-    `—— 我只管叼画,讲课是它们的事。`,
   ].join('\n');
 }

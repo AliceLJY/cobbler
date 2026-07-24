@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sendTelegramMessage, sendTelegramPhoto, formatHippoCardText, formatFollowupText, formatMuseumCaption, formatMuseumFollowupText, formatBookCardText, formatBookFollowupText } from '../lib/tg-send.js';
+import { sendTelegramMessage, sendTelegramPhoto, formatHippoCardText, formatFollowupText, formatBookCardText, formatBookFollowupText } from '../lib/tg-send.js';
 
 const ok = { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 1 } }) };
 const bad = { ok: false, status: 502, json: async () => ({ ok: false, description: 'bad gateway' }) };
@@ -65,39 +65,6 @@ test('sendTelegramPhoto 失败重试 + 缺 token throw', async () => {
   await sendTelegramPhoto({ token: 't', chatId: 1, photo: 'p' }, { fetchImpl, baseDelayMs: 1 });
   assert.equal(calls, 2);
   await assert.rejects(sendTelegramPhoto({ token: '', chatId: 1, photo: 'p' }), /missing token/);
-});
-
-const MCARD = {
-  artworkTitle: '睡莲', artist: '莫奈', dateDisplay: '1906', body: 'B', mutter: 'M',
-  followups: ['F1', 'F2'], museumUrl: 'https://www.metmuseum.org/art/collection/search/16568',
-};
-
-test('formatMuseumCaption 含标题/作者行/嘟囔/回我提示,不含 followups,不超 TG 上限', () => {
-  const t = formatMuseumCaption(MCARD, '2026-07-11');
-  assert.ok(t.startsWith('🖼️ 美术馆扭蛋 · 7月11日'));
-  assert.ok(t.includes('「睡莲」'));
-  assert.ok(t.includes('莫奈 · 1906'));
-  assert.ok(t.includes('—— M') && t.includes('回我一下'));
-  assert.ok(!t.includes('F1'));
-  assert.ok(t.length <= 1024);
-});
-
-test('formatMuseumCaption 无作者/年代时不留空行', () => {
-  const t = formatMuseumCaption({ ...MCARD, artist: null, dateDisplay: null }, '2026-07-11');
-  assert.ok(!t.includes('\n\n\n'));
-});
-
-test('formatMuseumFollowupText 条子带馆藏页链接和问题,不带 wiki 路径', () => {
-  const t = formatMuseumFollowupText(MCARD);
-  assert.ok(t.includes('https://www.metmuseum.org/art/collection/search/16568'));
-  assert.ok(t.includes('1. F1') && t.includes('2. F2'));
-  assert.ok(t.includes('「睡莲」') && t.includes('莫奈'));
-  assert.ok(!t.includes('wiki/'));
-});
-
-test('formatMuseumFollowupText 兼容首日 artic 旧卡(articUrl)', () => {
-  const t = formatMuseumFollowupText({ ...MCARD, museumUrl: undefined, articUrl: 'https://www.artic.edu/artworks/1' });
-  assert.ok(t.includes('artic.edu/artworks/1'));
 });
 
 const BCARD = {

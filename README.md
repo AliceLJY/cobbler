@@ -51,7 +51,7 @@ The nest feeds on two sources, both pluggable and both optional:
 - **git history** — everyone has this. `nest/collect.js` scans every repo under `~/Projects/*/` and only counts commits *you* authored (identity read from `git config --global`). Fork the repo, run the nest, and your Cobbler digs "this day N months ago" out of your own commits from day one.
 - **learning logs** — my personal markdown check-in tables (`| # | MM-DD | source | topic |` rows in `YYYY-MM.md` files). If the directory doesn't exist, the pipeline silently skips it. To feed your own journal/notes, mimic `nest/lib/parse-learnings.js` — any parser that returns `{date, kind, title, detail}` items plugs straight in.
 
-There is no Cobbler account, hosted backend, or telemetry. Raw history remains on the Mac mini, but selected source text is sent through the installed Claude CLI when generation is enabled; museum cards call the Met API, Telegram feeds call the Bot API, and EAS builds use Expo's service. Source text is marked as untrusted data and Claude runs with tools, browser integration, and session persistence disabled. Plain templates cover Claude failures.
+There is no Cobbler account, hosted backend, or telemetry. Raw history remains on the Mac mini, but selected source text is sent through the installed Claude CLI when generation is enabled; Telegram feeds call the Bot API, and EAS builds use Expo's service. Source text is marked as untrusted data and Claude runs with tools, browser integration, and session persistence disabled. Plain templates cover Claude failures.
 
 ## Status
 

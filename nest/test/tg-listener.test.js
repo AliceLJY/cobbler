@@ -7,9 +7,8 @@ import { handleUpdate, latestHippoCard, latestCard, pollLoop } from '../tg-liste
 import { readJSON } from '../lib/store.js';
 
 const CARD = { date: '2026-07-05', pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md', followups: ['F1', 'F2'], mutter: 'M' };
-const MUSEUM_CARD = {
-  date: '2026-07-05', source: 'museum', artworkTitle: '睡莲', artist: '莫奈',
-  museumUrl: 'https://www.metmuseum.org/art/collection/search/1', followups: ['MF1', 'MF2'], mutter: 'M',
+const BOOK_CARD = {
+  date: '2026-07-05', source: 'book', bookTitle: '倦怠社会', bookDir: 'd1', followups: ['BF1', 'BF2'], mutter: 'M',
 };
 
 async function withDataDir(cards, fn) {
@@ -60,18 +59,6 @@ test('还没有任何卡 → 回开张提示', async () => {
   });
 });
 
-test('museum 卡日期更新 → latestCard 选它,回 museum 条子(带馆藏链接,无 wiki 路径)', async () => {
-  await withDataDir([{ ...CARD, date: '2026-07-04' }], async (dir) => {
-    await mkdir(join(dir, 'museum-cards'), { recursive: true });
-    await writeFile(join(dir, 'museum-cards', '2026-07-05.json'), JSON.stringify(MUSEUM_CARD));
-    const c = await latestCard(dir);
-    assert.equal(c.source, 'museum');
-    const r = await handleUpdate({ message: { text: 'q', chat: { id: 1 } } }, { chatId: 1, dataDir: dir });
-    assert.ok(r.includes('collection/search/1') && r.includes('1. MF1'));
-    assert.ok(!r.includes('wiki/'));
-  });
-});
-
 test('book 卡最新 → 回 book 条子(带 FULL.md 路径)', async () => {
   await withDataDir([{ ...CARD, date: '2026-07-04' }], async (dir) => {
     await mkdir(join(dir, 'book-cards'), { recursive: true });
@@ -84,10 +71,10 @@ test('book 卡最新 → 回 book 条子(带 FULL.md 路径)', async () => {
   });
 });
 
-test('同日两张卡 → mtime 晚的胜(hippo 21:00 晚于 museum 08:30)', async () => {
+test('同日两张卡 → mtime 晚的胜(hippo 21:00 晚于 book 12:30)', async () => {
   await withDataDir([], async (dir) => {
-    await mkdir(join(dir, 'museum-cards'), { recursive: true });
-    await writeFile(join(dir, 'museum-cards', '2026-07-05.json'), JSON.stringify(MUSEUM_CARD));
+    await mkdir(join(dir, 'book-cards'), { recursive: true });
+    await writeFile(join(dir, 'book-cards', '2026-07-05.json'), JSON.stringify(BOOK_CARD));
     await new Promise((r) => setTimeout(r, 20));
     await mkdir(join(dir, 'hippo-cards'), { recursive: true });
     await writeFile(join(dir, 'hippo-cards', '2026-07-05.json'), JSON.stringify(CARD));
