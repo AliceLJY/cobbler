@@ -2,7 +2,7 @@ import { appendFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
-import { sendTelegramMessage, formatFollowupText, formatMuseumFollowupText, formatBookFollowupText } from './lib/tg-send.js';
+import { sendTelegramMessage, formatFollowupText, formatBookFollowupText } from './lib/tg-send.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -22,8 +22,8 @@ export async function latestHippoCard(dataDir) {
   return hit ? readJSON(hit.file, null) : null;
 }
 
-// 扭蛋管线里取"最新投喂"的一张:先比日期,同日比 mtime(museum 08:30 → book 12:30 → hippo 21:00)
-const CARD_DIRS = ['hippo-cards', 'museum-cards', 'book-cards'];
+// 扭蛋管线里取"最新投喂"的一张:先比日期,同日比 mtime(book 12:30 → hippo 21:00)
+const CARD_DIRS = ['hippo-cards', 'book-cards'];
 
 export async function latestCard(dataDir) {
   const cands = (await Promise.all(CARD_DIRS.map((d) => latestIn(dataDir, d)))).filter(Boolean);
@@ -32,7 +32,7 @@ export async function latestCard(dataDir) {
   return readJSON(cands[cands.length - 1].file, null);
 }
 
-const FOLLOWUP_FORMATTERS = { museum: formatMuseumFollowupText, book: formatBookFollowupText };
+const FOLLOWUP_FORMATTERS = { book: formatBookFollowupText };
 
 function isPermanentTelegramError(error) {
   const status = Number(error?.telegramCode ?? error?.status);
