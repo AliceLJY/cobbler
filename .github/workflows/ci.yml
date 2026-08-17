@@ -36,4 +36,4 @@ jobs:
         run: npm run check
       - name: Fail on high-severity dependency findings
         working-directory: app
-        run: npm audit --audit-level=high
+        run: npm run audit:ci
