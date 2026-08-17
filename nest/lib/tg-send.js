@@ -79,13 +79,23 @@ export function formatBookCardText(card, dateISO) {
   ].join('\n');
 }
 
-export function formatBookFollowupText(card, ebooksDisplay = '~/Downloads/hermes-shared/ebooks/cc-ingested') {
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", `'"'"'`)}'`;
+}
+
+export function formatBookFollowupText(
+  card,
+  ebookReader = 'python3 ~/Downloads/sync-bridge/scripts-bin/ebook-query.py read',
+) {
   const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
-  const anchor = card.quote ? `,先 grep 引文"${card.quote.slice(0, 15)}"定位到我讲的那段` : '';
+  const anchor = card.quote ? ` --grep ${shellQuote(card.quote.slice(0, 40))} --context 8` : '';
+  const command = `${ebookReader} --book ${shellQuote(card.bookDir)} --chapter 'FULL.md'${anchor}`;
   return [
     '条子拿好,整段复制,发给隔壁随便哪个大个子:',
     '',
-    `请读 ${ebooksDisplay}/${card.bookDir}/FULL.md(书:《${card.bookTitle}》)${anchor},重点回答:`,
+    '电子书正式消费库只在 mini,不要读取 MacBook 同名目录。请先运行双机统一命令:',
+    command,
+    `输出路径应以 mini: 开头(书:《${card.bookTitle}》),再结合原文上下文重点回答:`,
     qs,
     '结合上下文讲,别泛泛。',
     '',

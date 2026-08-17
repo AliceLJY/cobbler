@@ -86,9 +86,19 @@ test('formatBookCardText 无 quote 不留引文行', () => {
   assert.ok(!t.includes('"') || !t.includes('\n\n\n'));
 });
 
-test('formatBookFollowupText 条子带 FULL.md 路径+grep 引文锚', () => {
+test('formatBookFollowupText 条子只引导统一入口查询 mini', () => {
   const t = formatBookFollowupText(BCARD);
-  assert.ok(t.includes('cc-ingested/d1-hash/FULL.md'));
-  assert.ok(t.includes('grep 引文"过度的积极性是病灶'));
+  assert.ok(t.includes('ebook-query.py read'));
+  assert.ok(t.includes("--book 'd1-hash' --chapter 'FULL.md'"));
+  assert.ok(t.includes("--grep '过度的积极性是病灶' --context 8"));
+  assert.ok(t.includes('正式消费库只在 mini'));
+  assert.ok(t.includes('输出路径应以 mini: 开头'));
+  assert.ok(!t.includes('cc-ingested/d1-hash/FULL.md'));
   assert.ok(t.includes('1. F1') && t.includes('2. F2'));
+});
+
+test('formatBookFollowupText 对目录和引文做 shell quoting', () => {
+  const t = formatBookFollowupText({ ...BCARD, bookDir: "alice's-book", quote: "reader's anchor" });
+  assert.ok(t.includes("--book 'alice'\"'\"'s-book'"));
+  assert.ok(t.includes("--grep 'reader'\"'\"'s anchor'"));
 });

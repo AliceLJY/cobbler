@@ -59,14 +59,16 @@ test('还没有任何卡 → 回开张提示', async () => {
   });
 });
 
-test('book 卡最新 → 回 book 条子(带 FULL.md 路径)', async () => {
+test('book 卡最新 → 回 book 条子(带 mini 统一查询命令)', async () => {
   await withDataDir([{ ...CARD, date: '2026-07-04' }], async (dir) => {
     await mkdir(join(dir, 'book-cards'), { recursive: true });
     await writeFile(join(dir, 'book-cards', '2026-07-06.json'), JSON.stringify({
       date: '2026-07-06', source: 'book', bookTitle: '倦怠社会', bookDir: 'd1', followups: ['BF1', 'BF2'],
     }));
     const r = await handleUpdate({ message: { text: 'q', chat: { id: 1 } } }, { chatId: 1, dataDir: dir });
-    assert.ok(r.includes('d1/FULL.md') && r.includes('1. BF1'));
+    assert.ok(r.includes("ebook-query.py read --book 'd1' --chapter 'FULL.md'") && r.includes('1. BF1'));
+    assert.ok(r.includes('正式消费库只在 mini'));
+    assert.ok(!r.includes('cc-ingested/d1/FULL.md'));
     assert.ok(!r.includes('wiki/'));
   });
 });
