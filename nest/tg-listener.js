@@ -59,8 +59,16 @@ export async function handleUpdate(update, { chatId, dataDir }) {
 }
 
 export async function pollLoop(cfg) {
-  const { dataDir, fetchImpl = fetch, sendImpl = sendTelegramMessage, log = console.log } = cfg;
+  const {
+    dataDir, fetchImpl = fetch, sendImpl = sendTelegramMessage, log = console.log,
+    // 连续 poll 失败到这个数就放弃进程,交给 launchd KeepAlive 重启:
+    // undici 的连接池会复用已经死掉的 socket(2026-08-23 实测一个僵进程重试上千次
+    // 都在往同一条 ESTABLISHED 死连接上打),原地重试再多也醒不过来,只有换进程才行。
+    pollFailLimit = 10, retryDelayMs = 5000,
+    onGiveUp = () => process.exit(1),
+  } = cfg;
   const offsetFile = join(dataDir, 'tg-offset.json');
+  let pollFails = 0;
 
   for (;;) {
     const tg = await readJSON(join(dataDir, 'tg.json'), null);
@@ -76,7 +84,17 @@ export async function pollLoop(cfg) {
       const body = await res.json();
       if (!body.ok) throw new Error(`getUpdates not ok: ${body.description ?? res.status}`);
       updates = body.result;
-    } catch (e) { log(`[hippo-listen] poll error: ${e.message ?? e}, retry in 5s`); await sleep(5000); continue; }
+    } catch (e) {
+      pollFails += 1;
+      log(`[hippo-listen] poll error: ${e.message ?? e} (连续 ${pollFails}/${pollFailLimit}), retry in ${retryDelayMs / 1000}s`);
+      if (pollFails >= pollFailLimit) {
+        log(`[hippo-listen] 连续 ${pollFails} 次 poll 失败,退出让 launchd 重建连接`);
+        return onGiveUp();
+      }
+      await sleep(retryDelayMs);
+      continue;
+    }
+    pollFails = 0;
 
     let failed = false;
     for (const u of updates) {

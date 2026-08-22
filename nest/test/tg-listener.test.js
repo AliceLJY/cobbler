@@ -131,3 +131,49 @@ test('永久 Telegram 4xx 写入死信并推进 offset', async () => {
     assert.match(deadLetter, /bot was blocked by the user/);
   });
 });
+
+test('连续 poll 失败到阈值就放弃进程,交给 launchd 重启', async () => {
+  await withDataDir([CARD], async (dir) => {
+    await writeFile(join(dir, 'tg.json'), JSON.stringify({ token: 't', chatId: 1 }));
+    let calls = 0;
+    let gaveUp = false;
+
+    await pollLoop({
+      dataDir: dir,
+      fetchImpl: async () => { calls += 1; throw new Error('fetch failed'); },
+      log: () => {},
+      pollFailLimit: 3,
+      retryDelayMs: 0,
+      onGiveUp: () => { gaveUp = true; },
+    });
+
+    assert.equal(gaveUp, true);
+    assert.equal(calls, 3, '到阈值就停,不该再多打一次');
+  });
+});
+
+test('poll 成功一次就把连续失败计数清零', async () => {
+  await withDataDir([CARD], async (dir) => {
+    await writeFile(join(dir, 'tg.json'), JSON.stringify({ token: 't', chatId: 1 }));
+    let calls = 0;
+    let gaveUp = false;
+
+    // 失败两次 → 成功一次(清零) → 再失败两次:全程没到 3 连败,不该放弃
+    await pollLoop({
+      dataDir: dir,
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls >= 3) return { json: async () => ({ ok: true, result: [] }) };
+        throw new Error('fetch failed');
+      },
+      log: () => {},
+      once: true,
+      pollFailLimit: 3,
+      retryDelayMs: 0,
+      onGiveUp: () => { gaveUp = true; },
+    });
+
+    assert.equal(gaveUp, false, '中间成功过就不该放弃');
+    assert.equal(calls, 3, '第 3 次成功后 once 模式应当返回');
+  });
+});
