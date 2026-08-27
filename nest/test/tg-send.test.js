@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sendTelegramMessage, sendTelegramPhoto, formatHippoCardText, formatFollowupText, formatBookCardText, formatBookFollowupText } from '../lib/tg-send.js';
+import { sendTelegramMessage, sendTelegramPhoto, splitForTelegram, formatHippoCardText, formatFollowupText, formatBookCardText, formatBookFollowupText } from '../lib/tg-send.js';
 
 const ok = { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 1 } }) };
 const bad = { ok: false, status: 502, json: async () => ({ ok: false, description: 'bad gateway' }) };
@@ -28,20 +28,23 @@ test('重试耗尽 → throw;缺 token → throw', async () => {
   await assert.rejects(sendTelegramMessage({ token: '', chatId: 1, text: 'x' }), /missing token/);
 });
 
-test('formatHippoCardText 纯文本简介卡:无考题,带回我提示', () => {
+test('formatHippoCardText 纯文本简介卡,并直接带上条子', () => {
   const text = formatHippoCardText(
-    { pageTitle: 'MediaPipe', body: 'B', followups: ['F1', 'F2'], mutter: 'M' },
+    { pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md', body: 'B', followups: ['F1', 'F2', 'F3'], mutter: 'M' },
     '2026-07-05',
   );
   assert.ok(text.startsWith('🥚 知识扭蛋 · 7月5日'));
   assert.ok(text.includes('「MediaPipe」'));
   assert.ok(text.includes('—— M'));
-  assert.ok(text.includes('回我一下'));
-  assert.ok(!text.includes('F1')); // followups 不进卡片,回复才给
+  // 条子直接进卡,不再让她回一句要
+  assert.ok(!text.includes('回我一下'));
+  assert.ok(text.includes('1. F1') && text.includes('2. F2') && text.includes('3. F3'));
+  assert.ok(text.includes('wiki/entities/MediaPipe.md'));
+  assert.ok(text.includes('不要生造事实'));
   assert.ok(!text.includes('*') && !text.includes('#'));
 });
 
-test('formatFollowupText 条子含页面路径和两个问题', () => {
+test('formatFollowupText 条子含页面路径和问题', () => {
   const text = formatFollowupText({ pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md', followups: ['F1', 'F2'] });
   assert.ok(text.includes('wiki/entities/MediaPipe.md'));
   assert.ok(text.includes('1. F1') && text.includes('2. F2'));
@@ -69,16 +72,30 @@ test('sendTelegramPhoto 失败重试 + 缺 token throw', async () => {
 
 const BCARD = {
   bookTitle: '倦怠社会', bookAuthor: '韩炳哲', bookDir: 'd1-hash', body: 'B', mutter: 'M',
-  quote: '过度的积极性是病灶', followups: ['F1', 'F2'],
+  quote: '过度的积极性是病灶', followups: ['F1', 'F2', 'F3'],
 };
 
-test('formatBookCardText 含书名/作者/引文/嘟囔,不含 followups', () => {
+test('formatBookCardText 含书名/作者/引文/嘟囔,并直接带上条子', () => {
   const t = formatBookCardText(BCARD, '2026-07-11');
   assert.ok(t.startsWith('📖 书堆扭蛋 · 7月11日'));
   assert.ok(t.includes('《倦怠社会 · 韩炳哲》'));
   assert.ok(t.includes('"过度的积极性是病灶"'));
-  assert.ok(t.includes('—— M') && t.includes('回我一下'));
-  assert.ok(!t.includes('F1'));
+  assert.ok(t.includes('—— M'));
+  // 条子直接进卡,不再让她回一句要
+  assert.ok(!t.includes('回我一下'));
+  assert.ok(t.includes('1. F1') && t.includes('2. F2') && t.includes('3. F3'));
+  assert.ok(t.includes('ebook-query.py read'));
+  assert.ok(t.includes("--book 'd1-hash' --chapter 'FULL.md'"));
+  assert.ok(t.includes('不要生造文献'));
+});
+
+test('formatBookCardText 长度留足 Telegram 4096 余量(最坏情况)', () => {
+  const worst = {
+    bookTitle: '书'.repeat(40), bookAuthor: '作'.repeat(20), bookDir: 'd'.repeat(120),
+    body: 'b'.repeat(140), mutter: 'm'.repeat(40), quote: 'q'.repeat(80),
+    followups: Array.from({ length: 7 }, (_, i) => `${i}`.repeat(80)),
+  };
+  assert.ok(formatBookCardText(worst, '2026-07-11').length < 4096);
 });
 
 test('formatBookCardText 无 quote 不留引文行', () => {
@@ -94,11 +111,41 @@ test('formatBookFollowupText 条子只引导统一入口查询 mini', () => {
   assert.ok(t.includes('正式消费库只在 mini'));
   assert.ok(t.includes('输出路径应以 mini: 开头'));
   assert.ok(!t.includes('cc-ingested/d1-hash/FULL.md'));
-  assert.ok(t.includes('1. F1') && t.includes('2. F2'));
+  assert.ok(t.includes('1. F1') && t.includes('2. F2') && t.includes('3. F3'));
 });
 
 test('formatBookFollowupText 对目录和引文做 shell quoting', () => {
   const t = formatBookFollowupText({ ...BCARD, bookDir: "alice's-book", quote: "reader's anchor" });
   assert.ok(t.includes("--book 'alice'\"'\"'s-book'"));
   assert.ok(t.includes("--grep 'reader'\"'\"'s anchor'"));
+});
+
+// —— 条子不限字数后,4096 兜底 ——
+test('splitForTelegram 不超限时原样单条', () => {
+  assert.deepEqual(splitForTelegram('a\nb'), ['a\nb']);
+});
+
+test('splitForTelegram 超限按行拆,不丢字不断行', () => {
+  const lines = Array.from({ length: 60 }, (_, i) => `${i}`.padEnd(100, 'x'));
+  const text = lines.join('\n');
+  const parts = splitForTelegram(text, 1000);
+  assert.ok(parts.length > 1);
+  assert.ok(parts.every((p) => p.length <= 1000));
+  assert.equal(parts.join('\n'), text); // 一个字都没丢
+});
+
+test('splitForTelegram 单行本身超限也硬切不丢字', () => {
+  const text = 'z'.repeat(2500);
+  const parts = splitForTelegram(text, 1000);
+  assert.equal(parts.length, 3);
+  assert.equal(parts.join(''), text);
+});
+
+test('sendTelegramMessage 超长自动分多条发出,不让整条 400 失败', async () => {
+  const sent = [];
+  const fetchImpl = async (_url, init) => { sent.push(JSON.parse(init.body).text); return ok; };
+  await sendTelegramMessage({ token: 't', chatId: 1, text: 'y'.repeat(9000) }, { fetchImpl });
+  assert.equal(sent.length, 3);
+  assert.ok(sent.every((t) => t.length <= 4096));
+  assert.equal(sent.join('').length, 9000);
 });

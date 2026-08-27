@@ -22,7 +22,19 @@ export function buildBookPrompt({ persona, book, excerpt }) {
     '- cardTitle: 一句点名这段在讲什么(≤30字,别只抄书名)',
     '- cardBody: 用你自己的话讲这段最值得讲的一个点:它说了什么、妙在哪或者刺在哪(≤140字)',
     '- quote: 从上面节选里原样抄一句最有味道的原文(≤80字,一字不改,必须能在节选里找到)',
-    '- followups: 数组,恰好 2 条。她想深挖时值得拿去问"隔壁大 bot"的具体问题(每条≤50字,具体到这本书或这段,别泛泛)',
+    '- followups: 数组,5 到 7 条。这是她要整段复制、拿去问大模型的问题条子——',
+    '  她每天都会真的去问,这份条子决定她这本书读得深不深,所以别敷衍。',
+    '  从下面这些角度里挑最能挖出东西的几个,一个角度一条,别都挤在同一类:',
+    '  · 证据链——这个论点靠哪几类材料撑起来,哪一环最薄弱',
+    '  · 反证与边界——什么情况下它会失效,有没有反例(别的社会、别的时期、别的人群)',
+    '  · 因果强度——从"两件事同时出现"到"这个导致那个"这一步怎么完成的,有没有共同的第三因',
+    '  · 传导机制——从 A 到 B 中间被跳过的环节是什么(制度、技术、行业、法律、市场)',
+    '  · 谱系与对手——这个说法承接自谁,作者相对前人新增了什么,学界谁反对、反对哪一点',
+    '  · 落点——放到今天、放到中文语境是什么位置,最不能直接搬的是哪一点',
+    '  · 元问题——有没有过度解释的风险,最强的反方论证长什么样',
+    '  长度不限——问题该多长就多长,宁可一条写满三行也别为了短砍掉限定条件;',
+    '  必须带这本书里的具体抓手(人名、概念、案例、年代、地名),',
+    '  不许写成"这本书核心论点是什么""这本书被批评最多的是哪点"这种放之四海皆可的空问。',
     '- mutter: 你的一句嘟囔(≤40字)',
     '只输出一个 JSON 对象:{"cardTitle":"...","cardBody":"...","quote":"...","followups":["...","..."],"mutter":"..."}',
   ].join('\n');
@@ -46,7 +58,8 @@ export async function generateBookCard(input, opts = {}) {
   for (const k of ['cardTitle', 'cardBody', 'mutter']) {
     if (typeof raw[k] !== 'string' || !raw[k].trim()) return null;
   }
-  if (!Array.isArray(raw.followups) || raw.followups.length < 1 || raw.followups.some((f) => typeof f !== 'string' || !f.trim())) return null;
+  // 条子是这张卡的主料(她每天整段复制去问大模型),少于 3 条视为没写成,走 fallback
+  if (!Array.isArray(raw.followups) || raw.followups.length < 3 || raw.followups.some((f) => typeof f !== 'string' || !f.trim())) return null;
   // 引文防伪:quote 必须原样出现在节选里,不是就丢弃(卡照发,不带引文)
   let quote = typeof raw.quote === 'string' && raw.quote.trim() ? raw.quote.trim() : null;
   if (quote && !input.excerpt.includes(quote)) quote = null;
@@ -54,14 +67,22 @@ export async function generateBookCard(input, opts = {}) {
     cardTitle: truncate(raw.cardTitle.trim(), 30),
     cardBody: truncate(raw.cardBody.trim(), 140),
     quote: quote ? truncate(quote, 80) : null,
-    followups: raw.followups.slice(0, 2).map((f) => truncate(f.trim(), 50)),
+    // 单条不截断:她要的是"有分量"的问题,砍字数等于砍掉限定条件(2026-08-27 她的要求)。
+    // 超 Telegram 4096 由 sendTelegramMessage 拆条兜底,不在这里丢内容。
+    followups: raw.followups.slice(0, 8).map((f) => f.trim()),
     mutter: truncate(raw.mutter.trim(), 40),
   };
 }
 
+// 兜底条子:模型挂了才用,此时只有书名没有内容,只能按角度骨架出通用问题。
+// 比不发强,但明显比模型生成的差 —— 连续出现说明 claude 调用在挂,去看 book.log。
 const FALLBACK_FOLLOWUPS = [
-  '这本书的核心论点是什么,作者用什么证据撑起来的',
-  '这本书这些年被批评最多的是哪一点,站得住吗',
+  '这本书的核心论点是什么,作者靠哪几类材料撑起来,哪一环最薄弱',
+  '从"相关"走到"因果"这一步作者怎么完成的,有没有可能是共同的第三因',
+  '什么情况下这个论点会失效?有没有反例的社会、时期或人群',
+  '这个说法承接自谁,作者相对前人新增了什么,学界谁反对、反对哪一点',
+  '放到今天、放到中文语境是什么位置,最不能直接搬的是哪一点',
+  '这套论证有没有过度解释的风险,最强的反方论证长什么样',
 ];
 
 const FALLBACK_MUTTERS = [
