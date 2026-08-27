@@ -31,9 +31,19 @@ jobs:
       - name: Install app dependencies
         working-directory: app
         run: npm ci
-      - name: Test, typecheck, and verify Expo versions
+      - name: Test and typecheck
         working-directory: app
         run: npm run check
+
+      # Expo 版本漂移是上游的时钟,不是本仓代码的问题:上游发一个 patch 这里就红,
+      # 而它报的是"没跟上最新",不是"坏了"。所以降级成告警不阻断——
+      # 长期红着的 CI 最大的代价不是难看,是下次真出问题时没人会注意到。
+      # (2026-08-27 实证:它从 08-22 起红了五天,直到当天连推三次 nest 改动才被看见。)
+      # 要追版本时手动跑:cd app && npx expo install --fix
+      - name: Check Expo version drift (advisory)
+        working-directory: app
+        continue-on-error: true
+        run: npm run expo:check
       - name: Fail on high-severity dependency findings
         working-directory: app
         run: npm run audit:ci
