@@ -21,7 +21,11 @@ export async function runBookCard(cfg) {
   const { book, excerpt } = picked;
 
   const persona = await readFile(personaPath, 'utf8');
-  const g = (await gen({ persona, book, excerpt })) ?? fallbackBookCard(book, excerpt, rng);
+  // 降级要留痕:fallback 卡长得跟正常卡一样(也有一组条子),静默降级她看不出来。
+  // 日志里出现 FALLBACK 就是 claude 调用挂了或条子没写成,连续出现要去查。
+  const log = cfg.log ?? console.error;
+  let g = await gen({ persona, book, excerpt });
+  if (!g) { log('[cobbler-book] FALLBACK 模型没出条子,降级到通用问题'); g = fallbackBookCard(book, excerpt, rng); }
 
   const card = {
     date: todayISO,

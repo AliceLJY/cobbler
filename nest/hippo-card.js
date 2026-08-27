@@ -30,7 +30,10 @@ export async function runHippoCard(cfg) {
   if (!page) throw new Error('hippo-card: nothing to pick');
 
   const persona = await readFile(personaPath, 'utf8');
-  const g = (await gen({ persona, page })) ?? fallbackHippoCard(page, rng);
+  // 降级要留痕,理由同 book-card.js
+  const log = cfg.log ?? console.error;
+  let g = await gen({ persona, page });
+  if (!g) { log('[cobbler-hippo] FALLBACK 模型没出条子,降级到通用问题'); g = fallbackHippoCard(page, rng); }
 
   const card = {
     date: todayISO,

@@ -41,7 +41,10 @@ export async function generateHippoCard(input, opts = {}) {
   const {
     claudeBin = `${process.env.HOME}/.local/bin/claude`,
     execImpl = pexec,
-    timeoutMs = 120000,
+    // 300s 不是拍脑袋:条子扩成 5-7 条不限字数后,生成时间跟着涨——
+    // 2026-08-27 实测一次 hippo 条子跑了 167s,旧的 120s 默认值会 execFile 超时,
+    // 被 catch 成 null 静默降级到 fallback 卡(她收到的是通用问题,还看不出哪里不对)。
+    timeoutMs = 300000,
   } = opts;
   let raw;
   try {
