@@ -30,6 +30,9 @@ export function buildHippoPrompt({ persona, page }) {
     '  · 关联——和她研究过的别的东西能接上吗,接口在哪,接上以后多出什么能力',
     '  · 盲区——这页当时漏掉了哪个角度,现在补上会改变结论吗',
     '  长度不限——问题该多长就多长,宁可一条写满三行也别为了短砍掉限定条件;',
+    '  质疑要写透,这比简洁重要得多——把「你在质疑什么、为什么这构成质疑、',
+    '  要推翻它得拿出什么新证据」三层都写出来,一条问题写成一整段话是好的不是缺点。',
+    '  宁可七条里有三条各写满一段,也别七条都缩成一句话。',
     '  必须带这页里的具体抓手(名字、概念、数字、时间),',
     '  不许写成"这个到今天还成立吗""和我的项目有什么关系"这种放之四海皆可的空问。',
     '- mutter: 你的一句嘟囔(≤40字)',
@@ -41,10 +44,12 @@ export async function generateHippoCard(input, opts = {}) {
   const {
     claudeBin = `${process.env.HOME}/.local/bin/claude`,
     execImpl = pexec,
-    // 300s 不是拍脑袋:条子扩成 5-7 条不限字数后,生成时间跟着涨——
-    // 2026-08-27 实测一次 hippo 条子跑了 167s,旧的 120s 默认值会 execFile 超时,
-    // 被 catch 成 null 静默降级到 fallback 卡(她收到的是通用问题,还看不出哪里不对)。
-    timeoutMs = 300000,
+    // 30 分钟 ≈ 不设限:实测生成最长 167s,这里留了 10 倍余量,
+    // 正常生成不可能被它砍掉 —— Alice 2026-08-27 明确「不要限制超时都没问题,
+    // 当天没收到我自己去后台查」。之所以不写 timeout:0(真·无限),是因为
+    // launchd 不并发跑同 label 的 job:一个挂死的进程会让此后每一天都静默不跑,
+    // 而她只会看到「今天没收到」,发现不了是永久卡死。30 分钟能自愈,代价为零。
+    timeoutMs = 1800000,
   } = opts;
   let raw;
   try {
@@ -92,5 +97,6 @@ export function fallbackHippoCard(page, rng = Math.random) {
     cardBody: truncate(page.summary, 140),
     followups: [...FALLBACK_FOLLOWUPS],
     mutter: pick(FALLBACK_MUTTERS),
+    fallback: true, // 理由同 book-gen
   };
 }

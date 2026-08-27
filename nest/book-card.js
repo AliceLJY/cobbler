@@ -38,6 +38,7 @@ export async function runBookCard(cfg) {
     followups: g.followups,
     mutter: g.mutter,
     source: 'book',
+    ...(g.fallback ? { fallback: true } : {}),
   };
   await writeJSONAtomic(join(dataDir, 'book-cards', `${todayISO}.json`), card);
   await writeJSONAtomic(historyFile, [...history, book.dir].slice(-HISTORY_LIMIT));

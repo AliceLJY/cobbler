@@ -149,3 +149,14 @@ test('sendTelegramMessage 超长自动分多条发出,不让整条 400 失败', 
   assert.ok(sent.every((t) => t.length <= 4096));
   assert.equal(sent.join('').length, 9000);
 });
+
+// —— 降级要在卡面看得见,不只在日志里 ——
+test('fallback 卡在条子上方标出「这组是兜底问题」,正常卡不标', () => {
+  const marked = formatBookCardText({ ...BCARD, fallback: true }, '2026-07-11');
+  assert.ok(marked.includes('兜底的通用问题'));
+  assert.ok(!formatBookCardText(BCARD, '2026-07-11').includes('兜底的通用问题'));
+
+  const hCard = { pageTitle: 'P', pageFile: 'concepts/P.md', body: 'B', mutter: 'M', followups: ['F1', 'F2', 'F3'] };
+  assert.ok(formatHippoCardText({ ...hCard, fallback: true }, '2026-07-05').includes('兜底的通用问题'));
+  assert.ok(!formatHippoCardText(hCard, '2026-07-05').includes('兜底的通用问题'));
+});

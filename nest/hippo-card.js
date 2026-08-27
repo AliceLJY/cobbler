@@ -45,6 +45,7 @@ export async function runHippoCard(cfg) {
     followups: g.followups,
     mutter: g.mutter,
     source: 'hippo',
+    ...(g.fallback ? { fallback: true } : {}),
   };
   await writeJSONAtomic(join(dataDir, 'hippo-cards', `${todayISO}.json`), card);
   await writeJSONAtomic(historyFile, [...history, page.file].slice(-HISTORY_LIMIT));

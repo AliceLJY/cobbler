@@ -61,5 +61,6 @@ test('fallbackBookCard 用书元数据+节选首句,永不空手', () => {
   assert.ok(c.cardBody.includes('韩炳哲'));
   assert.ok(c.quote.includes('功绩社会'));
   assert.ok(c.followups.length >= 3);
+  assert.equal(c.fallback, true); // 卡面据此标出降级
   assert.ok(c.mutter);
 });

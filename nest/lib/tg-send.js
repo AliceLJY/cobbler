@@ -89,6 +89,9 @@ export function formatHippoCardText(card, dateISO, hippoDirDisplay = DEFAULT_HIP
     `—— ${card.mutter}`,
     '',
     '━━━━━━━━━━',
+    ...(card.fallback
+      ? ['(今天模型没写成条子,下面这组是兜底的通用问题,不针对这一页。)', '']
+      : []),
     '条子拿好,整段复制发给隔壁大个子:',
     '',
     hippoFollowupBody(card, hippoDirDisplay),
@@ -122,6 +125,9 @@ export function formatBookCardText(card, dateISO, ebookReader = DEFAULT_EBOOK_RE
     `—— ${card.mutter}`,
     '',
     '━━━━━━━━━━',
+    ...(card.fallback
+      ? ['(今天模型没写成条子,下面这组是兜底的通用问题,不针对这本书。)', '']
+      : []),
     '条子拿好,整段复制发给隔壁大个子:',
     '',
     bookFollowupBody(card, ebookReader),

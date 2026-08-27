@@ -52,5 +52,6 @@ test('fallbackHippoCard 用页面标题和摘要,自带 followups,永不空手',
   assert.equal(c.cardTitle, 'MediaPipe');
   assert.equal(c.cardBody, 'Google 浏览器端 ML 感知库。');
   assert.ok(c.followups.length >= 3);
+  assert.equal(c.fallback, true); // 卡面据此标出降级
   assert.ok(c.mutter);
 });
