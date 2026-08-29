@@ -14,7 +14,9 @@ const HISTORY_LIMIT = 90;
 
 export async function runHippoCard(cfg) {
   const { hippoDir, dataDir, personaPath, todayISO, rng = Math.random } = cfg;
-  const gen = cfg.hippoGen ?? generateHippoCard;
+  // log 提到 gen 之前:gen 的默认实现要把降级原因写进同一份日志
+  const log = cfg.log ?? console.error;
+  const gen = cfg.hippoGen ?? ((input) => generateHippoCard(input, { onFail: log }));
   const send = cfg.sendImpl ?? sendTelegramMessage;
   const gitPull = cfg.gitPull ?? (() => pexec('git', ['-C', hippoDir, 'pull', '--ff-only', '--quiet'], { timeout: 30000 }));
 
@@ -30,8 +32,6 @@ export async function runHippoCard(cfg) {
   if (!page) throw new Error('hippo-card: nothing to pick');
 
   const persona = await readFile(personaPath, 'utf8');
-  // 降级要留痕,理由同 book-card.js
-  const log = cfg.log ?? console.error;
   let g = await gen({ persona, page });
   if (!g) { log('[cobbler-hippo] FALLBACK 模型没出条子,降级到通用问题'); g = fallbackHippoCard(page, rng); }
 

@@ -11,7 +11,9 @@ const HISTORY_LIMIT = 90;
 
 export async function runBookCard(cfg) {
   const { ebooksRoot, dataDir, personaPath, todayISO, rng = Math.random } = cfg;
-  const gen = cfg.bookGen ?? generateBookCard;
+  // log 提到 gen 之前:gen 的默认实现要把降级原因写进同一份日志
+  const log = cfg.log ?? console.error;
+  const gen = cfg.bookGen ?? ((input) => generateBookCard(input, { onFail: log }));
   const send = cfg.sendImpl ?? sendTelegramMessage;
 
   const historyFile = join(dataDir, 'book-history.json');
@@ -22,8 +24,7 @@ export async function runBookCard(cfg) {
 
   const persona = await readFile(personaPath, 'utf8');
   // 降级要留痕:fallback 卡长得跟正常卡一样(也有一组条子),静默降级她看不出来。
-  // 日志里出现 FALLBACK 就是 claude 调用挂了或条子没写成,连续出现要去查。
-  const log = cfg.log ?? console.error;
+  // 日志里出现 FALLBACK 就是 claude 调用挂了或条子没写成,紧跟其后的一行写明原因。
   let g = await gen({ persona, book, excerpt });
   if (!g) { log('[cobbler-book] FALLBACK 模型没出条子,降级到通用问题'); g = fallbackBookCard(book, excerpt, rng); }
 

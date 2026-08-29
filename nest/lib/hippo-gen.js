@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE } from './claude-gen.js';
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog } from './claude-gen.js';
 
 const pexec = promisify(execFile);
 
@@ -50,6 +50,7 @@ export async function generateHippoCard(input, opts = {}) {
     // launchd 不并发跑同 label 的 job:一个挂死的进程会让此后每一天都静默不跑,
     // 而她只会看到「今天没收到」,发现不了是永久卡死。30 分钟能自愈,代价为零。
     timeoutMs = 1800000,
+    onFail,
   } = opts;
   let raw;
   try {
@@ -58,7 +59,11 @@ export async function generateHippoCard(input, opts = {}) {
       maxBuffer: 1024 * 1024,
     });
     raw = parseClaudeJSON(stdout);
-  } catch { return null; }
+    if (!raw) onFail?.(`[hippo] 输出里没有可解析 JSON: ${clipForLog(stdout)}`);
+  } catch (err) {
+    onFail?.(`[hippo] claude 调用失败: ${clipForLog(err?.stderr || err?.message || err)}`);
+    return null;
+  }
   if (!raw) return null;
   for (const k of ['cardTitle', 'cardBody', 'mutter']) {
     if (typeof raw[k] !== 'string' || !raw[k].trim()) return null;

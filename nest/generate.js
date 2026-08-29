@@ -10,7 +10,8 @@ import { readState, writeState, writeCard } from './lib/store.js';
 
 export async function runPipeline(cfg) {
   const { dataDir, personaPath, todayISO, rng = Math.random } = cfg;
-  const claudeGen = cfg.claudeGen ?? generateWithClaude;
+  const log = cfg.log ?? console.error;
+  const claudeGen = cfg.claudeGen ?? ((input) => generateWithClaude(input, { onFail: log }));
 
   const { items, signals } = await collect(cfg);
   const mood = judgeMood(signals, todayISO);
