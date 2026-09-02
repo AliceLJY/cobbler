@@ -68,6 +68,33 @@ export function describeBadCard(raw, requiredKeys) {
   return null;
 }
 
+// 模型写超长条子时会在数组里插自己的占位标记 —— 2026-09-02 实测见过
+// "followups_placeholder_removed"、"instr_placeholder_1"、"followups_2" 三种。
+// 它们多数时候把 JSON 结构写坏(解析失败,还能被发现),但也会像那天重跑时一样
+// 恰好写成合法的字符串元素,于是"非空字符串"这道校验放它过去,垃圾直接发进她的条子。
+// prompt 里根本没有 placeholder 字样,是模型自己加的,所以只能在接收端拦。
+// 判据取最保守的一条:真条子必然是一句话(含中文、空格或标点),
+// 而残留是个纯 ASCII 标识符 —— 不可能有真条子长成 /^[A-Za-z0-9_-]+$/。
+// 长度取双边界,两条都是被测试逼出来的,别当成随手拍的数字:
+//   下限 6 —— 第一版只写"纯标识符就丢",当场误杀了测试里的 'F1' / 'a' / 'b' 这类短占位(6 条变红);
+//   上限 40 —— 补完下限后又误杀了 'q'.repeat(300) 那条超长 fixture(2 条变红)。
+// 残留本质是模型写出来的**变量名**,见过的三种是 11 / 19 / 29 字符,变量名不会有 40+ 字符;
+// 而真条子必然带空格或标点,根本不匹配纯标识符。宁可漏一条也不误伤真条子。
+const JUNK_MIN_LEN = 6;
+const JUNK_MAX_LEN = 40;
+export function stripFollowupJunk(followups) {
+  if (!Array.isArray(followups)) return { clean: followups, dropped: [] };
+  const dropped = [];
+  const clean = followups.filter((f) => {
+    if (typeof f !== 'string') return true;
+    const t = f.trim();
+    const looksLikeIdentifier = t.length >= JUNK_MIN_LEN && t.length <= JUNK_MAX_LEN && /^[A-Za-z0-9_-]+$/.test(t);
+    if (looksLikeIdentifier) { dropped.push(f); return false; }
+    return true;
+  });
+  return { clean, dropped };
+}
+
 // 条子是书堆/hippo 卡的主料,少于 3 条视为没写成。单独成函数是为了让"不合格"的
 // 具体形态(不是数组 / 条数不够 / 有空条)写进日志,而不是笼统一句没写成。
 export function describeBadFollowups(followups) {

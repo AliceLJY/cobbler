@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describeExecFailure, describeBadCard, describeBadFollowups, execClaude } from '../lib/claude-gen.js';
+import { describeExecFailure, describeBadCard, describeBadFollowups, execClaude, stripFollowupJunk } from '../lib/claude-gen.js';
 import { generateBookCard } from '../lib/book-gen.js';
 
 // 2026-09-02 事故的防复发断言。那天 12:30 书堆卡降级,日志里唯一的一行原因是
@@ -117,4 +117,55 @@ test('execClaude 主动关掉子进程 stdin:噪音源头,不是可有可无的�
 test('execClaude 对拿不到 .child 的 mock 不炸(测试里的 execImpl 就是这种)', async () => {
   const r = await execClaude(async () => ({ stdout: 'ok' }), 'bin', [], {});
   assert.deepEqual(r, { stdout: 'ok' });
+});
+
+// 2026-09-02 重跑今天那张卡时当场撞上:模型把 "followups_placeholder_removed" 写成了
+// 合法的字符串元素,JSON 解析通过、"非空字符串"校验也通过,这条垃圾直接发进了她的 TG。
+// prompt 里没有 placeholder 字样,是模型自己插的,只能在接收端拦。
+test('模型插进数组的占位残留必须被摘掉,不许发出去', () => {
+  const { clean, dropped } = stripFollowupJunk([
+    '真条子:这个论点靠哪几类材料撑起来?',
+    'followups_placeholder_removed',
+    'instr_placeholder_1',
+    'followups_2',
+    '另一条真条子:反例在哪?',
+  ]);
+  assert.deepEqual(clean, ['真条子:这个论点靠哪几类材料撑起来?', '另一条真条子:反例在哪?']);
+  assert.equal(dropped.length, 3);
+});
+
+// 第一版判据("纯 ASCII 标识符就丢")当场误杀了 book-gen / hippo-gen 测试里的
+// 'F1' / 'a' / 'b' 这类短占位 fixture,6 条测试变红。故补长度下限,并把误伤面钉在这里。
+test('过滤判据不许误伤真条子:英文条子、带标点的短句、短占位都要留下', () => {
+  const real = [
+    'What evidence supports this claim?',
+    '这个说法承接自谁?',
+    'A/B 对照能不能做?',
+    'Chilisa (2012) 的证据链最薄弱在哪一环',
+    'F1',            // 别人测试里的短占位,不是模型残留
+    'a',
+    'q'.repeat(300), // 超长纯字母串也不是变量名,别当残留丢掉
+  ];
+  const { clean, dropped } = stripFollowupJunk(real);
+  assert.deepEqual(clean, real);
+  assert.equal(dropped.length, 0);
+});
+
+test('残留被摘掉后条数不够,仍走降级而不是发一份缺斤少两的条子', async () => {
+  const fails = [];
+  const notes = [];
+  const execImpl = async () => ({ stdout: '{"cardTitle":"T","cardBody":"B","mutter":"M","followups":["真问题一?","真问题二?","followups_3","placeholder_x"]}' });
+  const r = await generateBookCard(bookInput, { execImpl, attempts: 1, onFail: (m) => fails.push(m), onNote: (m) => notes.push(m) });
+  assert.equal(r, null, '摘掉残留后只剩 2 条,不够 3 条,应降级');
+  assert.ok(notes[0].includes('丢弃 2 条'));
+  assert.ok(fails[0].includes('只有 2 条'));
+});
+
+test('残留摘掉后条数仍够 → 正常出卡,且日志留一行说明模型又写残留了', async () => {
+  const notes = [];
+  const execImpl = async () => ({ stdout: '{"cardTitle":"T","cardBody":"B","mutter":"M","followups":["一?","二?","三?","followups_4"]}' });
+  const r = await generateBookCard(bookInput, { execImpl, attempts: 1, onNote: (m) => notes.push(m) });
+  assert.deepEqual(r.followups, ['一?', '二?', '三?']);
+  assert.equal(notes.length, 1);
+  assert.ok(notes[0].includes('followups_4'));
 });

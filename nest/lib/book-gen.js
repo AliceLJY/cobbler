@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
 import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog,
-  describeExecFailure, describeBadCard, describeBadFollowups, execClaude } from './claude-gen.js';
+  describeExecFailure, describeBadCard, describeBadFollowups, execClaude, stripFollowupJunk } from './claude-gen.js';
 
 const pexec = promisify(execFile);
 
@@ -74,6 +74,7 @@ async function generateBookCardOnce(input, opts = {}) {
     // 而她只会看到「今天没收到」,发现不了是永久卡死。30 分钟能自愈,代价为零。
     timeoutMs = 1800000,
     onFail,
+    onNote,
   } = opts;
   let raw;
   try {
@@ -92,7 +93,10 @@ async function generateBookCardOnce(input, opts = {}) {
   const badCard = describeBadCard(raw, ['cardTitle', 'cardBody', 'mutter']);
   if (badCard) { onFail?.(`[book] 卡片不合格: ${badCard}`); return null; }
   // 条子是这张卡的主料(她每天整段复制去问大模型),少于 3 条视为没写成,走 fallback
-  const badFollowups = describeBadFollowups(raw.followups);
+  // 先摘掉模型插进数组的占位残留,再判够不够 3 条 —— 残留不该算进条数,更不该发出去。
+  const { clean: followups, dropped } = stripFollowupJunk(raw.followups);
+  if (dropped.length) onNote?.(`[book] 丢弃 ${dropped.length} 条模型占位残留: ${clipForLog(JSON.stringify(dropped))}`);
+  const badFollowups = describeBadFollowups(followups);
   if (badFollowups) { onFail?.(`[book] 条子没写成: ${badFollowups}`); return null; }
   // 引文防伪:quote 必须原样出现在节选里,不是就丢弃(卡照发,不带引文)
   let quote = typeof raw.quote === 'string' && raw.quote.trim() ? raw.quote.trim() : null;
@@ -103,7 +107,7 @@ async function generateBookCardOnce(input, opts = {}) {
     quote: quote ? truncate(quote, 80) : null,
     // 单条不截断:她要的是"有分量"的问题,砍字数等于砍掉限定条件(2026-08-27 她的要求)。
     // 超 Telegram 4096 由 sendTelegramMessage 拆条兜底,不在这里丢内容。
-    followups: raw.followups.slice(0, 8).map((f) => f.trim()),
+    followups: followups.slice(0, 8).map((f) => f.trim()),
     mutter: truncate(raw.mutter.trim(), 40),
   };
 }

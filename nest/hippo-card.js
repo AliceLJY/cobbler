@@ -16,7 +16,7 @@ export async function runHippoCard(cfg) {
   const { hippoDir, dataDir, personaPath, todayISO, rng = Math.random } = cfg;
   // log 提到 gen 之前:gen 的默认实现要把降级原因写进同一份日志
   const log = cfg.log ?? console.error;
-  const gen = cfg.hippoGen ?? ((input) => generateHippoCard(input, { onFail: log }));
+  const gen = cfg.hippoGen ?? ((input) => generateHippoCard(input, { onFail: log, onNote: log }));
   const send = cfg.sendImpl ?? sendTelegramMessage;
   const gitPull = cfg.gitPull ?? (() => pexec('git', ['-C', hippoDir, 'pull', '--ff-only', '--quiet'], { timeout: 30000 }));
 

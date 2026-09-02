@@ -2,3 +2,5 @@ node_modules/
 nest/data/
 *.log
 .expo/
+.claude/
+
