@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog } from './claude-gen.js';
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog,
+  describeExecFailure, describeBadCard, describeBadFollowups, execClaude } from './claude-gen.js';
 
 const pexec = promisify(execFile);
 
@@ -40,7 +41,21 @@ export function buildHippoPrompt({ persona, page }) {
   ].join('\n');
 }
 
+// 重试一次再兜底,理由同 book-gen(模型偶发写坏 followups 结构 / 调用瞬时故障)。
 export async function generateHippoCard(input, opts = {}) {
+  const { attempts = 2, onFail, ...rest } = opts;
+  for (let i = 1; i <= attempts; i += 1) {
+    const isLast = i === attempts;
+    const card = await generateHippoCardOnce(input, {
+      ...rest,
+      onFail: (m) => onFail?.(isLast ? m : `${m} [第 ${i}/${attempts} 次,重试]`),
+    });
+    if (card) return card;
+  }
+  return null;
+}
+
+async function generateHippoCardOnce(input, opts = {}) {
   const {
     claudeBin = `${process.env.HOME}/.local/bin/claude`,
     execImpl = pexec,
@@ -54,22 +69,23 @@ export async function generateHippoCard(input, opts = {}) {
   } = opts;
   let raw;
   try {
-    const { stdout } = await execImpl(claudeBin, claudePrintArgs(buildHippoPrompt(input)), {
+    const { stdout } = await execClaude(execImpl, claudeBin, claudePrintArgs(buildHippoPrompt(input)), {
       timeout: timeoutMs,
       maxBuffer: 1024 * 1024,
     });
-    raw = parseClaudeJSON(stdout);
-    if (!raw) onFail?.(`[hippo] 输出里没有可解析 JSON: ${clipForLog(stdout)}`);
+    let parseErr = null;
+    raw = parseClaudeJSON(stdout, (e) => { parseErr = e; });
+    if (!raw) onFail?.(`[hippo] 输出里没有可解析 JSON: ${parseErr} | 原样:${clipForLog(stdout)}`);
   } catch (err) {
-    onFail?.(`[hippo] claude 调用失败: ${clipForLog(err?.stderr || err?.message || err)}`);
+    onFail?.(`[hippo] claude 调用失败: ${describeExecFailure(err)}`);
     return null;
   }
   if (!raw) return null;
-  for (const k of ['cardTitle', 'cardBody', 'mutter']) {
-    if (typeof raw[k] !== 'string' || !raw[k].trim()) return null;
-  }
+  const badCard = describeBadCard(raw, ['cardTitle', 'cardBody', 'mutter']);
+  if (badCard) { onFail?.(`[hippo] 卡片不合格: ${badCard}`); return null; }
   // 条子是这张卡的主料(她每天整段复制去问大模型),少于 3 条视为没写成,走 fallback
-  if (!Array.isArray(raw.followups) || raw.followups.length < 3 || raw.followups.some((f) => typeof f !== 'string' || !f.trim())) return null;
+  const badFollowups = describeBadFollowups(raw.followups);
+  if (badFollowups) { onFail?.(`[hippo] 条子没写成: ${badFollowups}`); return null; }
   return {
     cardTitle: truncate(raw.cardTitle.trim(), 30),
     cardBody: truncate(raw.cardBody.trim(), 140),

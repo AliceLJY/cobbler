@@ -33,6 +33,7 @@ export async function runHippoCard(cfg) {
 
   const persona = await readFile(personaPath, 'utf8');
   let g = await gen({ persona, page });
+  // FALLBACK = 重试后仍没写成;怎么读它前面那 1~2 行原因,见 book-card.js 同处注释。
   if (!g) { log('[cobbler-hippo] FALLBACK 模型没出条子,降级到通用问题'); g = fallbackHippoCard(page, rng); }
 
   const card = {

@@ -29,6 +29,54 @@ export function clipForLog(s) {
   return t.length > CLIP ? `${t.slice(0, CLIP)} …[truncated ${t.length - CLIP} of ${t.length} chars]` : t;
 }
 
+// execFile 默认给子进程留一个永不关闭的 stdin 管道,claude 等 3 秒 EOF 才放弃,
+// 并把一条 warning 写进 stderr —— **调用成功时也照样写**(2026-09-02 实测)。
+// 正是这条常驻 warning 在那天把真实死因挤出了日志(见下方 describeExecFailure)。
+// 主动 end 掉 stdin:噪音源头消失,行为不变(claude 本就 "proceeding without it"),
+// 实测 stderr 从那条 warning 变为完全空。同款防御 codex-run.sh / kimi-run.sh 早在用。
+// promisify(execFile) 的 promise 带 .child;测试里 mock 的 execImpl 没有,故用可选链。
+export function execClaude(execImpl, bin, args, opts) {
+  const pending = execImpl(bin, args, opts);
+  pending?.child?.stdin?.end();
+  return pending;
+}
+
+// claude 失败时,原因可能落在 stdout / stderr / err.message 三处任一,必须全都留痕。
+// 2026-09-02 事故:stderr 里**常驻**一条 stdin warning(调用成功时也照样出现),
+// 而原写法 `err.stderr || err.message` 让这条无关 warning 永远排在最前、把真实死因
+// 整个挤掉 —— 那天 12:30 书堆卡降级,日志里只有那句 warning,死因至今不可回溯。
+// exit code 也一并记:它单独不可作判据(见上方 2026-08-30 注释),但和输出合看能分型。
+export function describeExecFailure(err) {
+  const parts = [];
+  if (err?.code !== undefined) parts.push(`exit=${err.code}`);
+  if (err?.signal) parts.push(`signal=${err.signal}`);
+  if (err?.killed) parts.push('killed=true');
+  const stdout = String(err?.stdout ?? '').trim();
+  const stderr = String(err?.stderr ?? '').trim();
+  if (stdout) parts.push(`stdout=${clipForLog(stdout)}`);
+  if (stderr) parts.push(`stderr=${clipForLog(stderr)}`);
+  if (!stdout && !stderr) parts.push(`message=${clipForLog(err?.message ?? err)}`);
+  return parts.join(' | ');
+}
+
+// 字段校验失败原本静默 `return null`,日志里只剩一行 FALLBACK、一个字的原因都没有
+// (2026-08-29 那次降级就是这样,事后无从判断模型到底写错了什么)。
+// 走到这里说明 JSON 解析成功、只是内容不合格,所以把原样一并留痕。
+export function describeBadCard(raw, requiredKeys) {
+  const missing = requiredKeys.filter((k) => typeof raw?.[k] !== 'string' || !raw[k].trim());
+  if (missing.length) return `字段缺失或为空:${missing.join(',')} | 原样:${clipForLog(JSON.stringify(raw))}`;
+  return null;
+}
+
+// 条子是书堆/hippo 卡的主料,少于 3 条视为没写成。单独成函数是为了让"不合格"的
+// 具体形态(不是数组 / 条数不够 / 有空条)写进日志,而不是笼统一句没写成。
+export function describeBadFollowups(followups) {
+  if (!Array.isArray(followups)) return `followups 不是数组:${clipForLog(JSON.stringify(followups))}`;
+  if (followups.length < 3) return `条子只有 ${followups.length} 条(需≥3):${clipForLog(JSON.stringify(followups))}`;
+  if (followups.some((f) => typeof f !== 'string' || !f.trim())) return `条子里有空条或非字符串:${clipForLog(JSON.stringify(followups))}`;
+  return null;
+}
+
 export function buildPrompt({ persona, mood, item, relTimeStr, needDiary, daysAway }) {
   const lines = [persona, '', `今天你的心情基调:${mood}。`];
   if (item) {
@@ -43,14 +91,49 @@ export function buildPrompt({ persona, mood, item, relTimeStr, needDiary, daysAw
   return lines.join('\n');
 }
 
-export function parseClaudeJSON(stdout) {
+// onParseError 是可选的:解析失败时把 JSON.parse 的具体报错交出去。
+// 不给的话行为与改造前完全一致(返回 null)。加它是因为原来这个 catch 把错误整个
+// 吞了,日志里只能看到「输出里没有可解析 JSON」加一段被截断的原文 —— 而 JSON 坏在
+// 哪一位(position N)恰恰是唯一能分型的信息:输出被截断、模型写串了结构、还是混入了非 JSON。
+export function parseClaudeJSON(stdout, onParseError) {
   const start = stdout.indexOf('{');
   const end = stdout.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try { return JSON.parse(stdout.slice(start, end + 1)); } catch { return null; }
+  if (start === -1 || end <= start) { onParseError?.('输出里找不到成对的花括号'); return null; }
+  const body = stdout.slice(start, end + 1);
+  try { return JSON.parse(body); } catch (e) {
+    const msg = String(e?.message ?? e);
+    // JSON.parse 报的 position N 是唯一能定位「坏在哪」的信息,必须顺着它去截原文。
+    // 2026-09-02 实测:坏点常落在 400~2200 位置(模型写 followups 数组写到中途,
+    // 把 "2":"..." 这种键值对塞进了数组里),而只截开头 300 字符时那里全是好的部分,
+    // 看了也判断不出模型到底写错了什么 —— 截断要截在有信息的地方。
+    const at = msg.match(/position (\d+)/);
+    if (at) {
+      const pos = Number(at[1]);
+      const from = Math.max(0, pos - 120);
+      onParseError?.(`${msg} | 坏点附近:…${body.slice(from, pos + 120)}…`);
+    } else {
+      onParseError?.(msg);
+    }
+    return null;
+  }
 }
 
+// 重试一次再兜底,理由同 book-gen。每日卡字段少、写坏概率低,但"调用瞬时失败"这一类
+// 同样命中它,而它的 timeout 是 120s,两次也就四分钟,launchd 07:30 那轮完全吃得下。
 export async function generateWithClaude(input, opts = {}) {
+  const { attempts = 2, onFail, ...rest } = opts;
+  for (let i = 1; i <= attempts; i += 1) {
+    const isLast = i === attempts;
+    const card = await generateWithClaudeOnce(input, {
+      ...rest,
+      onFail: (m) => onFail?.(isLast ? m : `${m} [第 ${i}/${attempts} 次,重试]`),
+    });
+    if (card) return card;
+  }
+  return null;
+}
+
+async function generateWithClaudeOnce(input, opts = {}) {
   const {
     claudeBin = `${process.env.HOME}/.local/bin/claude`,
     execImpl = pexec,
@@ -59,24 +142,28 @@ export async function generateWithClaude(input, opts = {}) {
   } = opts;
   let raw;
   try {
-    const { stdout } = await execImpl(claudeBin, claudePrintArgs(buildPrompt(input)), {
+    const { stdout } = await execClaude(execImpl, claudeBin, claudePrintArgs(buildPrompt(input)), {
       timeout: timeoutMs,
       maxBuffer: 1024 * 1024,
     });
-    raw = parseClaudeJSON(stdout);
-    if (!raw) onFail?.(`[nest] 输出里没有可解析 JSON: ${clipForLog(stdout)}`);
+    let parseErr = null;
+    raw = parseClaudeJSON(stdout, (e) => { parseErr = e; });
+    if (!raw) onFail?.(`[nest] 输出里没有可解析 JSON: ${parseErr} | 原样:${clipForLog(stdout)}`);
   } catch (err) {
-    onFail?.(`[nest] claude 调用失败: ${clipForLog(err?.stderr || err?.message || err)}`);
+    onFail?.(`[nest] claude 调用失败: ${describeExecFailure(err)}`);
     return null;
   }
-  if (
-    !raw
-    || typeof raw.cardTitle !== 'string'
-    || typeof raw.cardBody !== 'string'
-    || typeof raw.mutter !== 'string'
-    || !raw.mutter.trim()
-    || (input.item && (!raw.cardTitle.trim() || !raw.cardBody.trim()))
-  ) return null;
+  if (!raw) return null;
+  // 校验逻辑与改造前逐条等价,只是把「不合格在哪」写进日志:三个字段都必须是字符串;
+  // mutter 恒不可为空;cardTitle/cardBody 仅在有 item(有素材可写)时不可为空。
+  const wrongType = ['cardTitle', 'cardBody', 'mutter'].filter((k) => typeof raw[k] !== 'string');
+  const emptied = (input.item ? ['cardTitle', 'cardBody', 'mutter'] : ['mutter'])
+    .filter((k) => typeof raw[k] === 'string' && !raw[k].trim());
+  if (wrongType.length || emptied.length) {
+    const why = [...wrongType.map((k) => `${k} 不是字符串`), ...emptied.map((k) => `${k} 为空`)].join(',');
+    onFail?.(`[nest] 卡片不合格: ${why} | 原样:${clipForLog(JSON.stringify(raw))}`);
+    return null;
+  }
   const out = {
     cardTitle: truncate(raw.cardTitle.trim(), 60),
     cardBody: truncate(raw.cardBody.trim(), 100),

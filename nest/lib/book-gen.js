@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog } from './claude-gen.js';
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog,
+  describeExecFailure, describeBadCard, describeBadFollowups, execClaude } from './claude-gen.js';
 
 const pexec = promisify(execFile);
 
@@ -43,7 +44,26 @@ export function buildBookPrompt({ persona, book, excerpt }) {
   ].join('\n');
 }
 
+// 降级不是只能认命:2026-09-02 实测,真实书库素材下模型约每三次就有一次把 followups
+// 数组的结构写坏(在数组里写成 "2":"..." 这种键值对),JSON 解析当场失败;而当天 12:30
+// 那次调用失败,07:30 和当晚手动跑都正常,是瞬时故障。两类都是"再来一次大概率就好"。
+// 所以先重试一次再谈兜底 —— 兜底卡对她是废品,多花的一分钟只在失败时才付。
+// 重试一样失败才降级,行为与改造前一致。
 export async function generateBookCard(input, opts = {}) {
+  const { attempts = 2, onFail, ...rest } = opts;
+  for (let i = 1; i <= attempts; i += 1) {
+    const isLast = i === attempts;
+    // 非最后一次的失败也要留痕,否则重试会把"第一次为什么失败"这个信息吞掉。
+    const card = await generateBookCardOnce(input, {
+      ...rest,
+      onFail: (m) => onFail?.(isLast ? m : `${m} [第 ${i}/${attempts} 次,重试]`),
+    });
+    if (card) return card;
+  }
+  return null;
+}
+
+async function generateBookCardOnce(input, opts = {}) {
   const {
     claudeBin = `${process.env.HOME}/.local/bin/claude`,
     execImpl = pexec,
@@ -57,22 +77,23 @@ export async function generateBookCard(input, opts = {}) {
   } = opts;
   let raw;
   try {
-    const { stdout } = await execImpl(claudeBin, claudePrintArgs(buildBookPrompt(input)), {
+    const { stdout } = await execClaude(execImpl, claudeBin, claudePrintArgs(buildBookPrompt(input)), {
       timeout: timeoutMs,
       maxBuffer: 1024 * 1024,
     });
-    raw = parseClaudeJSON(stdout);
-    if (!raw) onFail?.(`[book] 输出里没有可解析 JSON: ${clipForLog(stdout)}`);
+    let parseErr = null;
+    raw = parseClaudeJSON(stdout, (e) => { parseErr = e; });
+    if (!raw) onFail?.(`[book] 输出里没有可解析 JSON: ${parseErr} | 原样:${clipForLog(stdout)}`);
   } catch (err) {
-    onFail?.(`[book] claude 调用失败: ${clipForLog(err?.stderr || err?.message || err)}`);
+    onFail?.(`[book] claude 调用失败: ${describeExecFailure(err)}`);
     return null;
   }
   if (!raw) return null;
-  for (const k of ['cardTitle', 'cardBody', 'mutter']) {
-    if (typeof raw[k] !== 'string' || !raw[k].trim()) return null;
-  }
+  const badCard = describeBadCard(raw, ['cardTitle', 'cardBody', 'mutter']);
+  if (badCard) { onFail?.(`[book] 卡片不合格: ${badCard}`); return null; }
   // 条子是这张卡的主料(她每天整段复制去问大模型),少于 3 条视为没写成,走 fallback
-  if (!Array.isArray(raw.followups) || raw.followups.length < 3 || raw.followups.some((f) => typeof f !== 'string' || !f.trim())) return null;
+  const badFollowups = describeBadFollowups(raw.followups);
+  if (badFollowups) { onFail?.(`[book] 条子没写成: ${badFollowups}`); return null; }
   // 引文防伪:quote 必须原样出现在节选里,不是就丢弃(卡照发,不带引文)
   let quote = typeof raw.quote === 'string' && raw.quote.trim() ? raw.quote.trim() : null;
   if (quote && !input.excerpt.includes(quote)) quote = null;

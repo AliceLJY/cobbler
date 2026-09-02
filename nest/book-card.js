@@ -24,7 +24,11 @@ export async function runBookCard(cfg) {
 
   const persona = await readFile(personaPath, 'utf8');
   // 降级要留痕:fallback 卡长得跟正常卡一样(也有一组条子),静默降级她看不出来。
-  // 日志里出现 FALLBACK 就是 claude 调用挂了或条子没写成,紧跟其后的一行写明原因。
+  // 日志里出现 FALLBACK = 重试后仍没写成。它前面有 1~2 行原因:带 [第 1/2 次,重试]
+  // 的是第一次尝试,不带的那行才是最终降级原因。原因分三类,各自都能自己说清:
+  //   调用失败      → exit= / stdout= / stderr= 三处全留(别只信 stderr,那里有常驻 warning)
+  //   JSON 解析失败 → 带 position N 和坏点附近原文(模型常写到 followups 中途跳出数组语法)
+  //   卡片/条子不合格 → 指名哪个字段空了、条子只有几条
   let g = await gen({ persona, book, excerpt });
   if (!g) { log('[cobbler-book] FALLBACK 模型没出条子,降级到通用问题'); g = fallbackBookCard(book, excerpt, rng); }
 
