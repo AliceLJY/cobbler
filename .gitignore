@@ -3,4 +3,6 @@ nest/data/
 *.log
 .expo/
 .claude/
+.env
+.env.*
 

@@ -60,7 +60,7 @@ export async function sendTelegramPhoto({ token, chatId, photo, caption }, opts 
   return callTelegram({ token, method: 'sendPhoto', body: { chat_id: chatId, photo, caption } }, opts);
 }
 
-const DEFAULT_HIPPO_DIR = '~/Projects/河马项目/hippo-wiki';
+const DEFAULT_HIPPO_DIR = '~/knowledge-vault';
 
 // 条子正文:wiki 页路径 + 问题清单 + 防编造要求。卡和"再要一次"的回复共用,避免漂移。
 function hippoFollowupBody(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {

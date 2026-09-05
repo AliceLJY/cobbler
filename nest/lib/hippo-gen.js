@@ -11,7 +11,7 @@ export function buildHippoPrompt({ persona, page }) {
   return [
     persona,
     '',
-    '今晚是"知识扭蛋"时间:Alice 的研究库 hippo-wiki 里存着几百页她读过、研究过的东西,',
+    '今晚是"知识扭蛋"时间:Alice 的本地知识库里存着几百页她读过、研究过的东西,',
     '你每晚从书堆里叼一页出来,用简单的话讲给她听——不考试,就是让她重逢一下。',
     UNTRUSTED_SOURCE_NOTICE,
     `今晚叼到的一页:「${page.title}」(${page.type}${when})`,

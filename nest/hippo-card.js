@@ -63,7 +63,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const HOME = process.env.HOME;
   const claudeBin = process.env.COBBLER_CLAUDE_BIN;
   runHippoCard({
-    hippoDir: process.env.COBBLER_HIPPO_DIR ?? `${HOME}/Projects/河马项目/hippo-wiki`,
+    hippoDir: process.env.COBBLER_HIPPO_DIR ?? `${HOME}/knowledge-vault`,
     dataDir: new URL('./data', import.meta.url).pathname,
     personaPath: new URL('./persona.md', import.meta.url).pathname,
     todayISO: localDateISO(),
