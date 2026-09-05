@@ -42,6 +42,8 @@ tailscale serve --bg --https=10000 http://127.0.0.1:8790   # expose inside your 
 
 `install.sh` is personal Mac mini wiring: its launchd templates expect this repository at `~/Projects/cobbler`. The three Telegram feeds and listener also expect an ignored `nest/data/tg.json`; the book and knowledge feeds depend on Alice's local libraries. They are not required to run the API or Android app. The knowledge feed's library path defaults to `~/knowledge-vault`; override it with the `COBBLER_HIPPO_DIR` environment variable to point at your own notes directory.
 
+Optional machine-local settings (knowledge-vault path, ebook path, Claude binary/model, port/host) go in `~/.config/cobbler/env` as `KEY=VALUE` lines — never in the repo. `install.sh` reads that file and writes the keys into every launchd plist, so re-running it keeps them. Keys: `COBBLER_HIPPO_DIR`, `COBBLER_EBOOKS_DIR`, `COBBLER_CLAUDE_BIN`, `COBBLER_CLAUDE_MODEL`, `COBBLER_PORT`, `COBBLER_HOST`.
+
 App builds read the nest URL from the `EXPO_PUBLIC_NEST_URL` environment variable. For a local app checkout, run `npm install` and `npm run check` under `app/`; EAS preview builds use `app/scripts/build-apk.sh` and a local Expo token file.
 
 ## Bring your own history
