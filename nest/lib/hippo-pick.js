@@ -48,7 +48,9 @@ export function parsePage(raw, fileName, dir) {
     dir,
     title: fm.title || fileName.replace(/\.md$/, ''),
     type: fm.type || DIR_TYPE[dir] || dir,
-    date: fm.updated || fm.created || null,
+    // created 优先：prompt 里这个值会被说成「她 X 前后研究过」，而 updated 是页面
+    // 最后编辑日（复核一次就会盖掉原研究日），拿它当研究时间会对模型撒谎。
+    date: fm.created || fm.updated || null,
     summary: extractSummary(raw),
   };
 }

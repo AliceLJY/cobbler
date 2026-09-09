@@ -44,6 +44,18 @@ test('parsePage 无 frontmatter 用文件名当标题,type 来自目录映射', 
   assert.equal(p.summary, '一句话。');
 });
 
+test('parsePage 的 date 取 created 而非 updated:复核过的老页不能被说成新研究的', () => {
+  // prompt 里这个值会被拼成「她 X 前后研究过」。Temporal Reasoning 页 2026-09-10 复核后
+  // updated 变成复核日,若优先取 updated 就等于告诉模型「她 9 月研究的」——是假话。
+  const raw = '---\ntitle: "Temporal Reasoning"\ntype: concept\ncreated: 2026-04-13\nupdated: 2026-09-10\n---\n\n正文。\n';
+  assert.equal(parsePage(raw, 'Temporal Reasoning.md', 'concepts').date, '2026-04-13');
+  // 只有 updated 时仍要兜住,不能返回 null
+  const onlyUpdated = '---\ntitle: "X"\nupdated: 2026-05-01\n---\n\n正文。\n';
+  assert.equal(parsePage(onlyUpdated, 'X.md', 'concepts').date, '2026-05-01');
+  // 两个都没有 → null(hippo-gen 据此省掉「前后研究过」那句)
+  assert.equal(parsePage('正文。\n', 'Y.md', 'concepts').date, null);
+});
+
 test('listHippoPages 扫三目录,排除 _index/CLAUDE.md', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'hippo-'));
   try {
