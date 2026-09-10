@@ -60,7 +60,9 @@ export async function sendTelegramPhoto({ token, chatId, photo, caption }, opts 
   return callTelegram({ token, method: 'sendPhoto', body: { chat_id: chatId, photo, caption } }, opts);
 }
 
-const DEFAULT_HIPPO_DIR = '~/knowledge-vault';
+// 条子里印给她的路径要跟真正读的那个一致 —— launchd 两条 plist 都传了 COBBLER_HIPPO_DIR,
+// 而调用点从不显式传第三个参数,写死默认值会让条子指向一个本机不存在的目录。
+const DEFAULT_HIPPO_DIR = process.env.COBBLER_HIPPO_DIR || '~/knowledge-vault';
 
 // 条子正文:wiki 页路径 + 问题清单 + 防编造要求。卡和"再要一次"的回复共用,避免漂移。
 function hippoFollowupBody(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {
