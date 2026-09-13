@@ -51,6 +51,15 @@ export function parsePage(raw, fileName, dir) {
     // created 优先：prompt 里这个值会被说成「她 X 前后研究过」，而 updated 是页面
     // 最后编辑日（复核一次就会盖掉原研究日），拿它当研究时间会对模型撒谎。
     date: fm.created || fm.updated || null,
+    // 这页建立之后有没有被回访过（2026-09-14 加）。
+    // 缘由：09-13 扭蛋抽中 2026-04 建的「Garry Tan」页，卡片照四月记录讲「GBrain 是
+    // 10K 文件的个人知识大脑」，而它当时早已是 15 万页的 agent brain——**卡片不知道
+    // 自己叼出来的是化石**。prompt 里那句「日期只是页面记录时间、不代表最后核验时间」
+    // 写得没错，但那是因为它**确实不知道**；给它这个字段，「不知道」就变成了可判断的事实。
+    // 三态，别塌成布尔：null = 缺字段判不了（≠「没回访过」，不许当未回访报）。
+    revisited: (fm.created && fm.updated)
+      ? (fm.created === fm.updated ? 'never' : fm.updated)
+      : null,
     summary: extractSummary(raw),
   };
 }

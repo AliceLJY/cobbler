@@ -82,3 +82,28 @@ test('pickHippoPage 排除 history、跳过无摘要页;全抽过则回退全池
   assert.equal(back.file, 'a'); // 全在 history → 回退全池随机
   assert.equal(pickHippoPage([{ file: 'x', summary: '' }], []), null);
 });
+
+// ---- revisited 三态（2026-09-14 加）----
+// 缘由：09-13 扭蛋抽中 2026-04 建的「Garry Tan」页，卡片照四月记录讲得笃定，
+// 而那页描述的对象早已面目全非。卡片当时无从知道这页有没有被回访过。
+
+test('parsePage: created===updated → revisited=never', () => {
+  const raw = `---\ntitle: X\ncreated: 2026-04-13\nupdated: 2026-04-13\n---\n\n正文。\n`;
+  assert.equal(parsePage(raw, 'X.md', 'entities').revisited, 'never');
+});
+
+test('parsePage: updated 晚于 created → revisited=该日期', () => {
+  const raw = `---\ntitle: X\ncreated: 2026-04-13\nupdated: 2026-09-13\n---\n\n正文。\n`;
+  assert.equal(parsePage(raw, 'X.md', 'entities').revisited, '2026-09-13');
+});
+
+test('parsePage: 缺 created 或 updated → revisited=null，不得塌成 never', () => {
+  const onlyCreated = `---\ntitle: X\ncreated: 2026-04-13\n---\n\n正文。\n`;
+  const onlyUpdated = `---\ntitle: X\nupdated: 2026-04-13\n---\n\n正文。\n`;
+  const neither = `---\ntitle: X\n---\n\n正文。\n`;
+  for (const raw of [onlyCreated, onlyUpdated, neither]) {
+    const p = parsePage(raw, 'X.md', 'entities');
+    assert.equal(p.revisited, null, '缺字段必须是 null');
+    assert.notEqual(p.revisited, 'never', '判不了 ≠ 没回访过');
+  }
+});
