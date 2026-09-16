@@ -6,6 +6,7 @@ import { generateBookCard, fallbackBookCard } from './lib/book-gen.js';
 import { sendTelegramMessage, formatBookCardText } from './lib/tg-send.js';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
 import { localDateISO } from './lib/dates.js';
+import { notifyFailure, shortHostname, firstLine } from './lib/notify-fail.js';
 
 const HISTORY_LIMIT = 90;
 
@@ -48,25 +49,42 @@ export async function runBookCard(cfg) {
   await writeJSONAtomic(join(dataDir, 'book-cards', `${todayISO}.json`), card);
   await writeJSONAtomic(historyFile, [...history, book.dir].slice(-HISTORY_LIMIT));
 
+  // 凭证坏了不能算成功(2026-09-17 改):此前 tg.json 读不到或缺 token/chatId 会静默 delivered=none、退出码 0。
+  // 卡片已写进 data/book-cards,抛错走 bookCardMain 的失败出口(退出码 1 + TG 报警)。
   const tg = await readJSON(join(dataDir, 'tg.json'), null);
-  if (tg?.token && tg?.chatId) {
-    await send({ token: tg.token, chatId: tg.chatId, text: formatBookCardText(card, todayISO) });
-    return { ...card, delivered: 'tg' };
+  if (!tg?.token || !tg?.chatId) throw new Error('tg.json 缺 token/chatId，卡片已写 data/book-cards 未送达');
+  await send({ token: tg.token, chatId: tg.chatId, text: formatBookCardText(card, todayISO) });
+  return { ...card, delivered: 'tg' };
+}
+
+// 命令行入口的成败出口(2026-09-17 加,mini 定时任务「失败不出声」统一排查):
+//   成功 → 一行带 ISO 时间戳的 ok(此前日志没有时间戳,事后分不清哪天);
+//   失败 → 带时间戳的 fail + 退出码 1 + 一条 TG 报警。报警走 cobbler-notify.sh(自带代理回退),
+//   卡片本身走的 tg-send 直连被 reset 时报警仍能出去。io.out / io.err / io.notify 只为测试注入,生产不传。
+export async function bookCardMain(cfg, io = {}) {
+  const out = io.out ?? console.log;
+  const err = io.err ?? console.error;
+  const notify = io.notify ?? notifyFailure;
+  try {
+    const c = await runBookCard(cfg);
+    out(`[cobbler-book] ${new Date().toISOString()} ok book="${c.bookTitle}" delivered=${c.delivered}`);
+    return c;
+  } catch (e) {
+    err(`[cobbler-book] ${new Date().toISOString()} fail`, e);
+    process.exitCode = 1;
+    await notify(`书堆扭蛋 12:30 失败@${shortHostname()}：${firstLine(e)}；日志 ~/Projects/cobbler/nest/data/book.log`, { log: err });
+    return null;
   }
-  return { ...card, delivered: 'none' };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const HOME = process.env.HOME;
   const claudeBin = process.env.COBBLER_CLAUDE_BIN;
-  runBookCard({
+  bookCardMain({
     ebooksRoot: process.env.COBBLER_EBOOKS_DIR ?? `${HOME}/Downloads/hermes-shared/ebooks/cc-ingested`,
     dataDir: new URL('./data', import.meta.url).pathname,
     personaPath: new URL('./persona.md', import.meta.url).pathname,
     todayISO: localDateISO(),
     ...(claudeBin ? { bookGen: (input) => generateBookCard(input, { claudeBin }) } : {}),
-  }).then(
-    (c) => { console.log(`[cobbler-book] ok book="${c.bookTitle}" delivered=${c.delivered}`); },
-    (e) => { console.error('[cobbler-book] fail', e); process.exitCode = 1; },
-  );
+  });
 }

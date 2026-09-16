@@ -8,6 +8,7 @@ import { generateHippoCard, fallbackHippoCard } from './lib/hippo-gen.js';
 import { sendTelegramMessage, formatHippoCardText } from './lib/tg-send.js';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
 import { localDateISO } from './lib/dates.js';
+import { notifyFailure, shortHostname, firstLine } from './lib/notify-fail.js';
 
 const pexec = promisify(execFile);
 const HISTORY_LIMIT = 90;
@@ -51,25 +52,39 @@ export async function runHippoCard(cfg) {
   await writeJSONAtomic(join(dataDir, 'hippo-cards', `${todayISO}.json`), card);
   await writeJSONAtomic(historyFile, [...history, page.file].slice(-HISTORY_LIMIT));
 
+  // 凭证坏了不能算成功(2026-09-17 改):此前 tg.json 读不到或缺 token/chatId 会静默 delivered=none、退出码 0。
+  // 卡片已写进 data/hippo-cards,抛错走 hippoCardMain 的失败出口(退出码 1 + TG 报警)。
   const tg = await readJSON(join(dataDir, 'tg.json'), null);
-  if (tg?.token && tg?.chatId) {
-    await send({ token: tg.token, chatId: tg.chatId, text: formatHippoCardText(card, todayISO) });
-    return { ...card, delivered: 'tg' };
+  if (!tg?.token || !tg?.chatId) throw new Error('tg.json 缺 token/chatId，卡片已写 data/hippo-cards 未送达');
+  await send({ token: tg.token, chatId: tg.chatId, text: formatHippoCardText(card, todayISO) });
+  return { ...card, delivered: 'tg' };
+}
+
+// 命令行入口的成败出口(2026-09-17 加),写法与理由见 book-card.js 同处注释。
+export async function hippoCardMain(cfg, io = {}) {
+  const out = io.out ?? console.log;
+  const err = io.err ?? console.error;
+  const notify = io.notify ?? notifyFailure;
+  try {
+    const c = await runHippoCard(cfg);
+    out(`[cobbler-hippo] ${new Date().toISOString()} ok page="${c.pageTitle}" delivered=${c.delivered}`);
+    return c;
+  } catch (e) {
+    err(`[cobbler-hippo] ${new Date().toISOString()} fail`, e);
+    process.exitCode = 1;
+    await notify(`知识扭蛋 21:00 失败@${shortHostname()}：${firstLine(e)}；日志 ~/Projects/cobbler/nest/data/hippo.log`, { log: err });
+    return null;
   }
-  return { ...card, delivered: 'none' };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const HOME = process.env.HOME;
   const claudeBin = process.env.COBBLER_CLAUDE_BIN;
-  runHippoCard({
+  hippoCardMain({
     hippoDir: process.env.COBBLER_HIPPO_DIR ?? `${HOME}/knowledge-vault`,
     dataDir: new URL('./data', import.meta.url).pathname,
     personaPath: new URL('./persona.md', import.meta.url).pathname,
     todayISO: localDateISO(),
     ...(claudeBin ? { hippoGen: (input) => generateHippoCard(input, { claudeBin }) } : {}),
-  }).then(
-    (c) => { console.log(`[cobbler-hippo] ok page="${c.pageTitle}" delivered=${c.delivered}`); },
-    (e) => { console.error('[cobbler-hippo] fail', e); process.exitCode = 1; },
-  );
+  });
 }
