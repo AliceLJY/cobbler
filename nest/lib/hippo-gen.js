@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog,
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, FOLLOWUP_JUDGMENT_RULES, clipForLog,
   describeExecFailure, describeBadCard, describeBadFollowups, execClaude, stripFollowupJunk } from './claude-gen.js';
 
 const pexec = promisify(execFile);
@@ -40,14 +40,15 @@ export function buildHippoPrompt({ persona, page }) {
     '    摘要里没有的数字和细节不要补造。上面若写了"没有登记过回访修订",那是记录上的事实,',
     '    可以据此把问题往"该怎么核对它还成不成立"上打,并让她说清哪一环最容易先失效——',
     '    但仍然不许替她断言它已经凉了',
-    '  · 反面——什么情况下这条不适用,最强的反对意见长什么样,谁在反对',
+    '  · 反面——点出这条最可能在哪个前提上站不住、该去哪类人或文献里找反对意见;反对意见本身留给她去问',
     '  · 落地——放到她现在的项目上具体该改哪一处,代价是什么,不改会怎样',
     '  · 关联——和她研究过的别的东西能接上吗,接口在哪,接上以后多出什么能力',
-    '  · 盲区——这页当时漏掉了哪个角度,现在补上会改变结论吗',
+    '  · 盲区——点出这页的记录停在哪个范围(只讲了哪一面),请她去查范围之外还该看什么、补上会不会改结论',
     '  长度不限——问题该多长就多长,宁可一条写满三行也别为了短砍掉限定条件;',
-    '  质疑要写透,这比简洁重要得多——把「你在质疑什么、为什么这构成质疑、',
-    '  要推翻它得拿出什么新证据」三层都写出来,一条问题写成一整段话是好的不是缺点。',
+    '  质疑要写透,这比简洁重要得多——把「审的是哪个前提或断言、为什么它是承重的(塌了会连带什么)、',
+    '  要推翻或坐实它得拿出什么证据」三层都写出来,一条问题写成一整段话是好的不是缺点。',
     '  宁可七条里有三条各写满一段,也别七条都缩成一句话。',
+    ...FOLLOWUP_JUDGMENT_RULES,
     '  必须带这页里的具体抓手(名字、概念、数字、时间),',
     '  不许写成"这个到今天还成立吗""和我的项目有什么关系"这种放之四海皆可的空问。',
     '- mutter: 你的一句嘟囔(≤40字)',

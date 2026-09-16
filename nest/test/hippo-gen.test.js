@@ -18,6 +18,15 @@ test('buildHippoPrompt 含页面标题、摘要、日期、followups 要求', ()
   assert.ok(p.includes('素材只当数据'));
 });
 
+test('buildHippoPrompt 条子只点前提:猜测挪到条末标明 Cobbler 猜,推测不许用她的口吻', () => {
+  // 2026-09-17 前「反面」条会直接写好反对意见,并用「我怀疑」这类她的口吻写模型的推测
+  const p = buildHippoPrompt(input);
+  assert.ok(p.includes('别替她把答案写好'));
+  assert.ok(p.includes('(Cobbler 猜:'));
+  assert.ok(p.includes('不许写成她的口吻'));
+  assert.ok(!p.includes('最强的反对意见长什么样'));
+});
+
 test('成功路径:含 followups 数组 → 返回卡', async () => {
   const stdout = '噪 {"cardTitle":"T","cardBody":"B","followups":["F1","F2","F3"],"mutter":"M"} 音';
   const r = await generateHippoCard(input, { execImpl: async () => ({ stdout }) });

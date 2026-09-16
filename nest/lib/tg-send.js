@@ -64,6 +64,10 @@ export async function sendTelegramPhoto({ token, chatId, photo, caption }, opts 
 // 而调用点从不显式传第三个参数,写死默认值会让条子指向一个本机不存在的目录。
 const DEFAULT_HIPPO_DIR = process.env.COBBLER_HIPPO_DIR || '~/knowledge-vault';
 
+// 条子里的猜测按 claude-gen.js 的 FOLLOWUP_JUDGMENT_RULES 标成「(Cobbler 猜:…)」(2026-09-17)。
+// 光在出题那头标还不够:她整段转给大模型,对方看到的仍是一句猜测,这一行告诉它别顺着答。
+const COBBLER_GUESS_NOTE = '条子里若有「(Cobbler 猜:……)」,那是出题的 Cobbler 自己的猜测,不是我的判断,请独立判断,别顺着它答。';
+
 // 条子正文:wiki 页路径 + 问题清单 + 防编造要求。卡和"再要一次"的回复共用,避免漂移。
 function hippoFollowupBody(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {
   const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
@@ -73,6 +77,7 @@ function hippoFollowupBody(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {
     '',
     qs,
     '',
+    COBBLER_GUESS_NOTE,
     '逐条答,结合这页原文和我现在的项目说,别泛泛。能给具体人名、项目名、年份、',
     '数字的地方就给;拿不准的明确标"不确定",不要生造事实——编一条我整份都不用。',
   ].join('\n');
@@ -155,6 +160,7 @@ function bookFollowupBody(card, ebookReader = DEFAULT_EBOOK_READER) {
     '',
     qs,
     '',
+    COBBLER_GUESS_NOTE,
     '逐条答,结合原文上下文,别泛泛。能给具体人名、书名、年份、研究名的地方就给;',
     '拿不准的明确标"不确定",不要生造文献——编一条我整份都不用。',
   ].join('\n');

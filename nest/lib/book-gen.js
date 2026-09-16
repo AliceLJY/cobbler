@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, clipForLog,
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, FOLLOWUP_JUDGMENT_RULES, clipForLog,
   describeExecFailure, describeBadCard, describeBadFollowups, execClaude, stripFollowupJunk } from './claude-gen.js';
 
 const pexec = promisify(execFile);
@@ -27,16 +27,17 @@ export function buildBookPrompt({ persona, book, excerpt }) {
     '  她每天都会真的去问,这份条子决定她这本书读得深不深,所以别敷衍。',
     '  从下面这些角度里挑最能挖出东西的几个,一个角度一条,别都挤在同一类:',
     '  · 证据链——这个论点靠哪几类材料撑起来,哪一环最薄弱',
-    '  · 反证与边界——什么情况下它会失效,有没有反例(别的社会、别的时期、别的人群)',
+    '  · 反证与边界——点出这个论点最依赖哪个前提、该到哪类社会或时期或人群里找反例;反例本身留给她去问',
     '  · 因果强度——从"两件事同时出现"到"这个导致那个"这一步怎么完成的,有没有共同的第三因',
     '  · 传导机制——从 A 到 B 中间被跳过的环节是什么(制度、技术、行业、法律、市场)',
     '  · 谱系与对手——这个说法承接自谁,作者相对前人新增了什么,学界谁反对、反对哪一点',
     '  · 落点——放到今天、放到中文语境是什么位置,最不能直接搬的是哪一点',
-    '  · 元问题——有没有过度解释的风险,最强的反方论证长什么样',
+    '  · 元问题——点出这段推理最可能在哪一步过度解释,请她去找最强的反方论证;反方论证本身别替她写',
     '  长度不限——问题该多长就多长,宁可一条写满三行也别为了短砍掉限定条件;',
-    '  质疑要写透,这比简洁重要得多——把「你在质疑什么、为什么这构成质疑、',
-    '  要推翻它得拿出什么新证据」三层都写出来,一条问题写成一整段话是好的不是缺点。',
+    '  质疑要写透,这比简洁重要得多——把「审的是哪个前提或断言、为什么它是承重的(塌了会连带什么)、',
+    '  要推翻或坐实它得拿出什么证据」三层都写出来,一条问题写成一整段话是好的不是缺点。',
     '  宁可七条里有三条各写满一段,也别七条都缩成一句话。',
+    ...FOLLOWUP_JUDGMENT_RULES,
     '  必须带这本书里的具体抓手(人名、概念、案例、年代、地名),',
     '  不许写成"这本书核心论点是什么""这本书被批评最多的是哪点"这种放之四海皆可的空问。',
     '- mutter: 你的一句嘟囔(≤40字)',

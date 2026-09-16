@@ -41,6 +41,8 @@ test('formatHippoCardText 纯文本简介卡,并直接带上条子', () => {
   assert.ok(text.includes('1. F1') && text.includes('2. F2') && text.includes('3. F3'));
   assert.ok(text.includes('wiki/entities/MediaPipe.md'));
   assert.ok(text.includes('不要生造事实'));
+  // 接条子的大模型要知道「(Cobbler 猜:…)」不是她的判断
+  assert.ok(text.includes('Cobbler 猜') && text.includes('不是我的判断'));
   assert.ok(!text.includes('*') && !text.includes('#'));
 });
 
@@ -87,6 +89,7 @@ test('formatBookCardText 含书名/作者/引文/嘟囔,并直接带上条子', 
   assert.ok(t.includes('ebook-query.py read'));
   assert.ok(t.includes("--book 'd1-hash' --chapter 'FULL.md'"));
   assert.ok(t.includes('不要生造文献'));
+  assert.ok(t.includes('Cobbler 猜') && t.includes('不是我的判断'));
 });
 
 test('formatBookCardText 长度留足 Telegram 4096 余量(最坏情况)', () => {

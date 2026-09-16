@@ -18,6 +18,12 @@ test('buildBookPrompt 含书名、作者、节选、quote 一字不改要求', (
   assert.ok(p.includes('必须带这本书里的具体抓手'));
 });
 
+test('buildBookPrompt 与知识扭蛋同一规则:只点前提、猜测标明 Cobbler 猜、推测不许用她的口吻', () => {
+  const p = buildBookPrompt(input);
+  assert.ok(p.includes('别替她把答案写好') && p.includes('(Cobbler 猜:') && p.includes('不许写成她的口吻'));
+  assert.ok(!p.includes('最强的反方论证长什么样'));
+});
+
 test('成功路径:quote 在节选内 → 保留', async () => {
   const stdout = JSON.stringify({ cardTitle: 'T', cardBody: 'B', quote: '过度的积极性是这个时代的病灶', followups: ['F1', 'F2', 'F3'], mutter: 'M' });
   const r = await generateBookCard(input, { execImpl: async () => ({ stdout }) });
