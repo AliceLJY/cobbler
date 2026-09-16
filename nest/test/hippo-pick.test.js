@@ -36,6 +36,27 @@ test('extractSummary 无 callout 时取首个正文段', () => {
   assert.equal(extractSummary(raw), '正文第一句。');
 });
 
+// ---- 兜底摘要的两类喂错（2026-09-17 修）----
+test('extractSummary 纯引用块导语收下并接上首段,callout 整块照旧跳过', () => {
+  // ideation-map 页的形状:导语被跳过时,模型只拿到「SKILL.md 原话。…」,前文丢失,
+  // 卡片就把本页概括当成 SKILL.md 原话、把 Alice 自己的 skill 说成外人的研究对象。
+  const raw = `---\ntitle: ideation-map\n---\n\n# ideation-map\n\n> Alice 现役 skill,定位是元研究。\n\n## 核心公式\n\n> [!key-insight]\n> 你的知识广度 × 用户的泛化能力。\n\nSKILL.md 原话。这一句定死了形状。\n`;
+  assert.equal(extractSummary(raw), 'Alice 现役 skill,定位是元研究。 SKILL.md 原话。这一句定死了形状。');
+});
+
+test('extractSummary 跳过 Navigation 导航行', () => {
+  // 09-07 codex-with-chatgpt 那张卡只拿到导航行,据此误报「正文只剩一行」。
+  const raw = `---\ntitle: X\n---\n\n# X\n\nNavigation: [[entities/_index|Entities]]\n\n## 基本信息\n\n- 仓库:example/x\n`;
+  assert.equal(extractSummary(raw), '- 仓库:example/x');
+});
+
+test('extractSummary 开头是非 summary 的 callout 时整块跳过;只有导语时返回导语', () => {
+  const calloutFirst = `---\ntitle: X\n---\n\n> [!warning] 注意\n> 这块是警示,不是摘要。\n\n正文第一句。\n`;
+  assert.equal(extractSummary(calloutFirst), '正文第一句。');
+  const leadOnly = `---\ntitle: X\n---\n\n# X\n\n> 只有导语,\n> 分两行。\n`;
+  assert.equal(extractSummary(leadOnly), '只有导语, 分两行。');
+});
+
 test('parsePage 无 frontmatter 用文件名当标题,type 来自目录映射', () => {
   const p = parsePage('> [!summary]\n> 一句话。\n', 'MediaPipe.md', 'entities');
   assert.equal(p.title, 'MediaPipe');

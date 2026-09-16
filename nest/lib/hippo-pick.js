@@ -28,17 +28,45 @@ export function extractSummary(raw) {
     const s = buf.join(' ').trim();
     if (s) return s;
   }
-  // 兜底:frontmatter 之后第一个正文段落
+  // 兜底:frontmatter 之后的导语引用块 + 第一个正文段落。
+  // 2026-09-17 前这里把所有 `>` 行一律跳过、只取第一个正文段,实测 1082 页里两类页喂错:
+  //  - 234 页用纯引用块写导语(`> 一句话…`),导语被跳过,模型拿到的是导语后面依赖上下文的句子。
+  //    ideation-map 页喂进去的是「SKILL.md 原话。这一句定死了…」,前文丢了,卡片就把本页的概括
+  //    当成 SKILL.md 原话引用、把 Alice 自己的 skill 说成外人研究对象;
+  //  - 132 页正文第一行是 `Navigation: [[…]]` 导航行,模型只拿到一行链接。09-07 codex-with-chatgpt
+  //    那张卡据此说「正文只剩一行」,而那页当天有 19 行正文。
+  // 规则:callout(`> [!type]` 起头的整块)照旧跳过;纯引用块导语收下;导航行跳过;导语与首段都有就拼起来。
   let body = raw;
   if (raw.startsWith('---')) {
     const end = raw.indexOf('\n---', 3);
     if (end !== -1) body = raw.slice(end + 4);
   }
-  for (const l of body.split('\n')) {
-    const t = l.trim();
-    if (t && !t.startsWith('#') && !t.startsWith('>') && !t.startsWith('|') && !t.startsWith('---')) return t;
+  const bodyLines = body.split('\n').map((l) => l.trim());
+  let lead = '';
+  let inCallout = false;
+  let k = 0;
+  while (k < bodyLines.length) {
+    const t = bodyLines[k];
+    if (!t) { inCallout = false; k++; continue; }
+    if (t.startsWith('>')) {
+      if (/^>\s*\[!/.test(t)) {
+        inCallout = true;
+      } else if (!inCallout && !lead) {
+        const buf = [];
+        while (k < bodyLines.length && bodyLines[k].startsWith('>')) buf.push(bodyLines[k++].replace(/^>\s?/, ''));
+        lead = buf.join(' ').trim();
+        continue;
+      }
+      k++;
+      continue;
+    }
+    inCallout = false;
+    if (!t.startsWith('#') && !t.startsWith('|') && !t.startsWith('---') && !/^Navigation:/i.test(t)) {
+      return lead ? `${lead} ${t}` : t;
+    }
+    k++;
   }
-  return '';
+  return lead;
 }
 
 export function parsePage(raw, fileName, dir) {
