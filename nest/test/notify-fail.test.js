@@ -242,7 +242,9 @@ async function cliTree(kind) {
   await mkdir(nest);
   const files = ['nest/lib', 'nest/book-card.js', 'nest/hippo-card.js', 'nest/persona.md', 'nest/package.json'];
   if (kind === 'old') {
-    execFileSync('bash', ['-c', `git -C "${REPO}" archive ${OLD_COMMIT} ${files.join(' ')} | tar -x -C "${root}"`], { stdio: ['ignore', 'ignore', 'pipe'] });
+    // pipefail:不开的话管道只认 tar 的退出码,macOS 的 bsdtar 读到空输入照样退 0,
+    // git 找不到旧 commit 的报错就被吞了,要到后面 realpath 才以 ENOENT 的样子冒出来
+    execFileSync('bash', ['-c', `set -o pipefail; git -C "${REPO}" archive ${OLD_COMMIT} ${files.join(' ')} | tar -x -C "${root}"`], { stdio: ['ignore', 'ignore', 'pipe'] });
   } else {
     for (const f of files) await cp(join(REPO, f), join(root, f), { recursive: true });
   }

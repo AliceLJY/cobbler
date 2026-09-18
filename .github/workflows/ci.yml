@@ -11,7 +11,12 @@ jobs:
   nest:
     runs-on: ubuntu-latest
     steps:
+      # notify-fail.test.js 的区分力校准要从旧 commit 取代码(git archive),
+      # 默认浅克隆只有最新一个 commit,找不到它就红(2026-09-16 连红两次就是这个)。
+      # 仓库很小,拉全历史几乎不花时间。
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
