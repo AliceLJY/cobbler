@@ -1,10 +1,14 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, FOLLOWUP_JUDGMENT_RULES, clipForLog,
-  describeExecFailure, describeBadCard, describeBadFollowups, execClaude, stripFollowupJunk } from './claude-gen.js';
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, FOLLOWUP_JUDGMENT_RULES, FOLLOWUP_BREVITY_RULES,
+  clipForLog, describeExecFailure, describeBadCard, describeBadFollowups, describeVoiceLeaks, describeOverlong,
+  execClaude, stripFollowupJunk } from './claude-gen.js';
 
 const pexec = promisify(execFile);
+
+// 条子最多 5 条(2026-09-19 起 3-5 条短问题,与知识扭蛋同改)。多出来的整条丢掉,单条永不截断。
+export const MAX_FOLLOWUPS = 5;
 
 export function buildBookPrompt({ persona, book, excerpt }) {
   return [
@@ -23,20 +27,17 @@ export function buildBookPrompt({ persona, book, excerpt }) {
     '- cardTitle: 一句点名这段在讲什么(≤30字,别只抄书名)',
     '- cardBody: 用你自己的话讲这段最值得讲的一个点:它说了什么、妙在哪或者刺在哪(≤140字)',
     '- quote: 从上面节选里原样抄一句最有味道的原文(≤80字,一字不改,必须能在节选里找到)',
-    '- followups: 数组,5 到 7 条。这是她要整段复制、拿去问大模型的问题条子——',
-    '  她每天都会真的去问,这份条子决定她这本书读得深不深,所以别敷衍。',
+    `- followups: 数组,3 到 ${MAX_FOLLOWUPS} 条。这是她要整段复制、拿去问大模型的问题条子——`,
+    '  她每天都会真的去问,所以别敷衍。',
     '  从下面这些角度里挑最能挖出东西的几个,一个角度一条,别都挤在同一类:',
     '  · 证据链——这个论点靠哪几类材料撑起来,哪一环最薄弱',
-    '  · 反证与边界——点出这个论点最依赖哪个前提、该到哪类社会或时期或人群里找反例;反例本身留给她去问',
-    '  · 因果强度——从"两件事同时出现"到"这个导致那个"这一步怎么完成的,有没有共同的第三因',
-    '  · 传导机制——从 A 到 B 中间被跳过的环节是什么(制度、技术、行业、法律、市场)',
-    '  · 谱系与对手——这个说法承接自谁,作者相对前人新增了什么,学界谁反对、反对哪一点',
-    '  · 落点——放到今天、放到中文语境是什么位置,最不能直接搬的是哪一点',
-    '  · 元问题——点出这段推理最可能在哪一步过度解释,请她去找最强的反方论证;反方论证本身别替她写',
-    '  长度不限——问题该多长就多长,宁可一条写满三行也别为了短砍掉限定条件;',
-    '  质疑要写透,这比简洁重要得多——把「审的是哪个前提或断言、为什么它是承重的(塌了会连带什么)、',
-    '  要推翻或坐实它得拿出什么证据」三层都写出来,一条问题写成一整段话是好的不是缺点。',
-    '  宁可七条里有三条各写满一段,也别七条都缩成一句话。',
+    '  · 反证与边界——这个论点最依赖哪个前提;反例本身留给她去问',
+    '  · 因果强度——从"两件事同时出现"到"这个导致那个",中间那一步站得住吗',
+    '  · 传导机制——从 A 到 B 中间被跳过的环节是什么',
+    '  · 谱系与对手——这个说法承接自谁,谁会反对',
+    '  · 落点——放到今天、放到中文语境,最不能直接搬的是哪一点',
+    '  · 元问题——这段推理最可能在哪一步过度解释;反方论证本身别替她写',
+    ...FOLLOWUP_BREVITY_RULES,
     ...FOLLOWUP_JUDGMENT_RULES,
     '  必须带这本书里的具体抓手(人名、概念、案例、年代、地名),',
     '  不许写成"这本书核心论点是什么""这本书被批评最多的是哪点"这种放之四海皆可的空问。',
@@ -102,13 +103,20 @@ async function generateBookCardOnce(input, opts = {}) {
   // 引文防伪:quote 必须原样出现在节选里,不是就丢弃(卡照发,不带引文)
   let quote = typeof raw.quote === 'string' && raw.quote.trim() ? raw.quote.trim() : null;
   if (quote && !input.excerpt.includes(quote)) quote = null;
+  const kept = followups.slice(0, MAX_FOLLOWUPS).map((f) => f.trim());
+  // 影子期检查(2026-09-19,理由见 claude-gen.js):只写日志,不拦、不重试。
+  const leaks = describeVoiceLeaks(kept);
+  if (leaks.length) onNote?.(`[book] 口吻检查(影子期,只记录): ${leaks.join(' / ')}`);
+  const overlong = describeOverlong(kept);
+  if (overlong.length) onNote?.(`[book] 写短检查(影子期,只记录): ${overlong.join(' / ')}`);
   return {
     cardTitle: truncate(raw.cardTitle.trim(), 30),
     cardBody: truncate(raw.cardBody.trim(), 140),
     quote: quote ? truncate(quote, 80) : null,
-    // 单条不截断:她要的是"有分量"的问题,砍字数等于砍掉限定条件(2026-08-27 她的要求)。
-    // 超 Telegram 4096 由 sendTelegramMessage 拆条兜底,不在这里丢内容。
-    followups: followups.slice(0, 8).map((f) => f.trim()),
+    // 单条不截断:砍字数等于砍掉限定条件(08-27 那次 50 字硬截断把问题砍在了半句)。
+    // 2026-09-19 起问题要写短,但靠 prompt 要求,不靠截断。
+    // 超 Telegram 4096 仍由 sendTelegramMessage 拆条兜底,不在这里丢内容。
+    followups: kept,
     mutter: truncate(raw.mutter.trim(), 40),
   };
 }

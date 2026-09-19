@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseFrontmatter, extractSummary, parsePage, listHippoPages, pickHippoPage } from '../lib/hippo-pick.js';
+import { parseFrontmatter, extractSummary, extractExcerpt, parsePage, listHippoPages, pickHippoPage } from '../lib/hippo-pick.js';
 
 const PAGE = `---
 type: concept
@@ -127,4 +127,30 @@ test('parsePage: 缺 created 或 updated → revisited=null，不得塌成 never
     assert.equal(p.revisited, null, '缺字段必须是 null');
     assert.notEqual(p.revisited, 'never', '判不了 ≠ 没回访过');
   }
+});
+
+// ---- 正文节选（2026-09-19 加）----
+// 缘由：此前模型只拿到一句摘要。09-19 那页摘要是 419 / 3,719 字，判决不在里面，
+// 条子就在页面已经回答过的地方打转。
+
+test('extractExcerpt 去掉 frontmatter,短页整页给', () => {
+  const raw = '---\ntitle: X\ncreated: 2026-07-24\n---\n\n# X\n\n判决:借四条,拒一套。\n';
+  assert.equal(extractExcerpt(raw), '# X\n\n判决:借四条,拒一套。');
+  assert.equal(parsePage(raw, 'X.md', 'sources').excerpt, '# X\n\n判决:借四条,拒一套。');
+});
+
+test('extractExcerpt 超长在上限前的换行处切,并写明切到多少、全页多少', () => {
+  const body = Array.from({ length: 30 }, (_, i) => `第${i}行${'字'.repeat(8)}`).join('\n');
+  const out = extractExcerpt(body, 100);
+  const [kept, marker] = out.split('\n…');
+  assert.ok(kept.length <= 100);
+  assert.ok(body.startsWith(kept)); // 前面一字不改
+  assert.equal(body[kept.length], '\n'); // 切在行边界,不把一行砍成半截
+  assert.equal(marker, `[节选到 ${kept.length} 字 / 全页 ${body.length} 字]`);
+});
+
+test('extractExcerpt 找不到合适换行就按上限硬切,标记照写', () => {
+  const body = '字'.repeat(500);
+  const out = extractExcerpt(body, 100);
+  assert.ok(out.startsWith('字'.repeat(100) + '\n…[节选到 100 字 / 全页 500 字]'));
 });

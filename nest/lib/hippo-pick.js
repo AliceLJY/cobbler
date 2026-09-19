@@ -69,6 +69,23 @@ export function extractSummary(raw) {
   return lead;
 }
 
+// 喂给模型的正文节选(2026-09-19 加)。上限按实测定:三个目录 1,118 页正文(去掉 frontmatter)
+// 中位 1,594 字、p90 3,977、p95 4,994、最长 17,530;5,000 字能让 95% 的页整页进去。
+// 超长就在上限前最近的换行处切,并在末尾写明切到多少、全页多少——裸切会让模型以为页面就这么长。
+export const EXCERPT_MAX_CHARS = 5000;
+export function extractExcerpt(raw, max = EXCERPT_MAX_CHARS) {
+  let body = raw;
+  if (raw.startsWith('---')) {
+    const end = raw.indexOf('\n---', 3);
+    if (end !== -1) body = raw.slice(end + 4);
+  }
+  body = body.trim();
+  if (body.length <= max) return body;
+  const nl = body.lastIndexOf('\n', max);
+  const cut = (nl > max * 0.8 ? body.slice(0, nl) : body.slice(0, max)).trimEnd();
+  return `${cut}\n…[节选到 ${cut.length} 字 / 全页 ${body.length} 字]`;
+}
+
 export function parsePage(raw, fileName, dir) {
   const fm = parseFrontmatter(raw);
   return {
@@ -89,6 +106,7 @@ export function parsePage(raw, fileName, dir) {
       ? (fm.created === fm.updated ? 'never' : fm.updated)
       : null,
     summary: extractSummary(raw),
+    excerpt: extractExcerpt(raw),
   };
 }
 

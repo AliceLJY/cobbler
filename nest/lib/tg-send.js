@@ -117,7 +117,8 @@ export function formatFollowupText(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {
 }
 
 // 条子直接拼进卡里,不再等她回一句 —— 她每天都会去问,多一轮往返只是给它机会掉链。
-// 单条问题不限字数,所以这里不保证 ≤4096 —— 由 sendTelegramMessage 的 splitForTelegram 兜底拆条。
+// 2026-09-19 起问题要求写短(3-5 条、一句话),正常远低于 4096;但写短靠 prompt 不靠截断,
+// 所以这里仍不保证 ≤4096 —— 由 sendTelegramMessage 的 splitForTelegram 兜底拆条。
 export function formatBookCardText(card, dateISO, ebookReader = DEFAULT_EBOOK_READER) {
   const [, m, d] = dateISO.split('-');
   const byline = [truncate(card.bookTitle, 40), card.bookAuthor].filter(Boolean).join(' · ');

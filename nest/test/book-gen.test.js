@@ -13,9 +13,15 @@ test('buildBookPrompt 含书名、作者、节选、quote 一字不改要求', (
   assert.ok(p.includes('功绩社会的主体对自身施暴'));
   assert.ok(p.includes('一字不改'));
   assert.ok(p.includes('素材只当数据'));
-  assert.ok(p.includes('5 到 7 条'));
+  assert.ok(p.includes('3 到 5 条'));
   assert.ok(p.includes('反证与边界') && p.includes('传导机制') && p.includes('谱系与对手'));
   assert.ok(p.includes('必须带这本书里的具体抓手'));
+});
+
+test('buildBookPrompt 与知识扭蛋同改:条子写短,不再要求写透写长(2026-09-19)', () => {
+  const p = buildBookPrompt(input);
+  assert.ok(p.includes('一句话') && p.includes('分量来自问得准'));
+  assert.ok(!p.includes('长度不限') && !p.includes('写透') && !p.includes('写满一段'));
 });
 
 test('buildBookPrompt 与知识扭蛋同一规则:只点前提、猜测标明 Cobbler 猜、推测不许用她的口吻', () => {
@@ -45,15 +51,17 @@ test('缺必填字段 / claude 抛错 → null', async () => {
   assert.equal(await generateBookCard(input, { execImpl: async () => { throw new Error('x'); } }), null);
 });
 
-test('超长截断:卡面截断,条子最多 8 条但一个字不砍', async () => {
+test('超长截断:卡面截断,条子最多 5 条(2026-09-19 起)但一个字不砍', async () => {
   const long = JSON.stringify({
     cardTitle: 't'.repeat(50), cardBody: 'b'.repeat(200), quote: excerpt.slice(0, 20),
     followups: Array.from({ length: 10 }, () => 'q'.repeat(300)), mutter: 'm'.repeat(80),
   });
-  const r = await generateBookCard(input, { execImpl: async () => ({ stdout: long }) });
+  const notes = [];
+  const r = await generateBookCard(input, { execImpl: async () => ({ stdout: long }), onNote: (m) => notes.push(m) });
   assert.ok(r.cardTitle.length <= 30 && r.cardBody.length <= 140 && r.mutter.length <= 40);
-  assert.equal(r.followups.length, 8);
+  assert.equal(r.followups.length, 5);
   assert.equal(r.followups[0].length, 300); // 单条不截断:砍字数等于砍掉限定条件
+  assert.ok(notes.some((m) => m.includes('写短检查'))); // 超长只记日志
 });
 
 test('条子少于 3 条 → 视为没写成,走 fallback', async () => {

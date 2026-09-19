@@ -11,11 +11,26 @@ test('buildHippoPrompt 含页面标题、摘要、日期、followups 要求', ()
   assert.ok(p.includes('Google 浏览器端 ML 感知库。'));
   assert.ok(p.includes('2026-07-05'));
   assert.ok(p.includes('followups'));
-  assert.ok(p.includes('5 到 7 条'));
+  assert.ok(p.includes('3 到 5 条'));
   assert.ok(p.includes('时效') && p.includes('反面') && p.includes('落地') && p.includes('盲区'));
-  assert.ok(p.includes('长度不限'));
   assert.ok(!p.includes('考她一个小问题'));
   assert.ok(p.includes('素材只当数据'));
+});
+
+test('buildHippoPrompt 条子写短:一句话、分量靠问得准,不再要求写透写长(2026-09-19)', () => {
+  const p = buildHippoPrompt(input);
+  assert.ok(p.includes('一句话') && p.includes('分量来自问得准'));
+  assert.ok(!p.includes('长度不限') && !p.includes('写透') && !p.includes('写满一段'));
+  // 写短不等于泛:抓手要求与时效护栏都还在
+  assert.ok(p.includes('必须带这页里的具体抓手'));
+  assert.ok(p.includes('别因为页子旧就预设结论已过期'));
+});
+
+test('buildHippoPrompt 有正文就整段带上,没有就不出现正文块', () => {
+  const withBody = buildHippoPrompt({ persona: 'P', page: { ...page, excerpt: '判决:借四条,拒一套。' } });
+  assert.ok(withBody.includes('这页正文') && withBody.includes('判决:借四条,拒一套。'));
+  assert.ok(withBody.includes('正文里已经回答过的问题别原样再问'));
+  assert.ok(!buildHippoPrompt(input).includes('这页正文('));
 });
 
 test('buildHippoPrompt 条子只点前提:猜测挪到条末标明 Cobbler 猜,推测不许用她的口吻', () => {
@@ -54,6 +69,36 @@ test('超长截断:卡面截断,但条子一个字不砍', async () => {
   assert.ok(r.cardTitle.length <= 30 && r.cardBody.length <= 140 && r.mutter.length <= 40);
   assert.equal(r.followups.length, 3);
   assert.equal(r.followups[0].length, 300); // 单条不截断:砍字数等于砍掉限定条件
+});
+
+test('条子超过 5 条 → 只留前 5 条,整条丢、单条不截断', async () => {
+  const many = JSON.stringify({ cardTitle: 'T', cardBody: 'B', followups: ['一一', '二二', '三三', '四四', '五五', '六六', '七七'], mutter: 'M' });
+  const r = await generateHippoCard(input, { execImpl: async () => ({ stdout: many }) });
+  assert.deepEqual(r.followups, ['一一', '二二', '三三', '四四', '五五']);
+});
+
+test('口吻漂移与超长只写日志,卡照发(影子期)', async () => {
+  const leak = JSON.stringify({
+    cardTitle: 'T', cardBody: 'B', mutter: 'M',
+    followups: ['这个定性大概影响了我对它的判断?', '它的判据是什么?', `它还成立吗?${'长'.repeat(100)}`],
+  });
+  const notes = [];
+  const r = await generateHippoCard(input, { execImpl: async () => ({ stdout: leak }), onNote: (m) => notes.push(m) });
+  assert.equal(r.followups.length, 3); // 不拦
+  assert.ok(notes.some((m) => m.includes('口吻检查') && m.includes('第 1 条')));
+  assert.ok(notes.some((m) => m.includes('写短检查') && m.includes('第 3 条')));
+});
+
+test('卡上文字剥掉 wiki 双链壳;喂给模型的正文保持原样', async () => {
+  const s = JSON.stringify({
+    cardTitle: '[[X]] 页', cardBody: '见 [[A|甲]]', mutter: 'M',
+    followups: ['[[digiton-agent-fleet]] 值得借吗?', '二?', '三?'],
+  });
+  const r = await generateHippoCard(input, { execImpl: async () => ({ stdout: s }) });
+  assert.equal(r.cardTitle, 'X 页');
+  assert.equal(r.cardBody, '见 甲');
+  assert.equal(r.followups[0], 'digiton-agent-fleet 值得借吗?');
+  assert.ok(buildHippoPrompt({ persona: 'P', page: { ...page, excerpt: '见 [[A]]' } }).includes('见 [[A]]'));
 });
 
 test('fallbackHippoCard 用页面标题和摘要,自带 followups,永不空手', () => {

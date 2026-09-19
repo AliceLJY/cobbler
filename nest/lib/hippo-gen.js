@@ -1,8 +1,19 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { truncate } from './templates.js';
-import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, FOLLOWUP_JUDGMENT_RULES, clipForLog,
-  describeExecFailure, describeBadCard, describeBadFollowups, execClaude, stripFollowupJunk } from './claude-gen.js';
+import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, FOLLOWUP_JUDGMENT_RULES, FOLLOWUP_BREVITY_RULES,
+  clipForLog, describeExecFailure, describeBadCard, describeBadFollowups, describeVoiceLeaks, describeOverlong,
+  execClaude, stripFollowupJunk } from './claude-gen.js';
+
+// 条子最多 5 条(2026-09-19 起 3-5 条短问题)。多出来的整条丢掉,单条永不截断。
+export const MAX_FOLLOWUPS = 5;
+
+// wiki 双链去壳:[[X]] → X,[[X|Y]] → Y(2026-09-19 加)。
+// 喂给模型的正文保持原样(页面里满是双链),模型会把 [[digiton-agent-fleet]] 这种原样抄进问题,
+// 发到 TG 是一串方括号噪音。只剥卡上显示的文字,不动喂进去的正文。
+export function stripWikilinks(s) {
+  return s.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2').replace(/\[\[([^\]]+)\]\]/g, '$1');
+}
 
 const pexec = promisify(execFile);
 
@@ -26,28 +37,27 @@ export function buildHippoPrompt({ persona, page }) {
     `今晚叼到的一页:「${page.title}」(${page.type}${when})`,
     ...(revisit ? [revisit] : []),
     `这页的摘要:${page.summary}`,
+    // 正文(2026-09-19 加):此前模型只拿到上面那句摘要。09-19 抽中「openspec-plus 借鉴审计」,
+    // 摘要是 419 / 3,719 字的导语 + 首段,判决、采纳表、「已覆盖」清单都不在里面,条子于是在
+    // 页面已经回答过的地方打转,还把「零代码」猜成了影响判断的理由(三条拒因里没有它)。
+    ...(page.excerpt ? ['这页正文(让你知道它已经说了什么、当时下了什么判断):', '---', page.excerpt, '---'] : []),
     '',
     '请写:',
     '- cardTitle: 一句点名这页讲的是什么(≤30字)',
     '- cardBody: 简单介绍:它是什么、当时为什么值得她研究,用你自己的话讲,克制但讲清(≤140字)',
-    '- followups: 数组,5 到 7 条。这是她要整段复制、拿去问大模型的问题条子——',
-    '  她每天都会真的去问,这份条子决定她这一页复习得深不深,所以别敷衍。',
-    '  这页是她自己研究过的东西,所以问题要往"还成立吗、能用吗"上打。',
+    `- followups: 数组,3 到 ${MAX_FOLLOWUPS} 条。这是她要整段复制、拿去问大模型的问题条子——`,
+    '  她每天都会真的去问,所以别敷衍。这页是她自己研究过的东西,问题要往"还成立吗、能用吗"上打。',
     '  从下面这些角度里挑最能挖出东西的几个,一个角度一条,别都挤在同一类:',
-    '  · 证据与出处——这页的判断当时基于什么,来源可靠吗,哪一环最薄弱',
-    '  · 时效——若摘要里有会变的具体断言(版本、产品状态、评测口径、实施前提),挑一条问',
-    '    它当时依赖什么、今天该怎么核对它还成不成立。**别因为页子旧就预设结论已过期**;',
-    '    摘要里没有的数字和细节不要补造。上面若写了"没有登记过回访修订",那是记录上的事实,',
-    '    可以据此把问题往"该怎么核对它还成不成立"上打,并让她说清哪一环最容易先失效——',
-    '    但仍然不许替她断言它已经凉了',
-    '  · 反面——点出这条最可能在哪个前提上站不住、该去哪类人或文献里找反对意见;反对意见本身留给她去问',
-    '  · 落地——放到她现在的项目上具体该改哪一处,代价是什么,不改会怎样',
-    '  · 关联——和她研究过的别的东西能接上吗,接口在哪,接上以后多出什么能力',
-    '  · 盲区——点出这页的记录停在哪个范围(只讲了哪一面),请她去查范围之外还该看什么、补上会不会改结论',
-    '  长度不限——问题该多长就多长,宁可一条写满三行也别为了短砍掉限定条件;',
-    '  质疑要写透,这比简洁重要得多——把「审的是哪个前提或断言、为什么它是承重的(塌了会连带什么)、',
-    '  要推翻或坐实它得拿出什么证据」三层都写出来,一条问题写成一整段话是好的不是缺点。',
-    '  宁可七条里有三条各写满一段,也别七条都缩成一句话。',
+    '  · 证据与出处——这页的判断当时基于什么,哪一环最薄弱',
+    '  · 时效——页面里若有会变的具体断言(版本、产品状态、评测口径、实施前提),挑一条问它今天还成不成立。',
+    '    **别因为页子旧就预设结论已过期**;页面里没有的数字和细节不要补造。上面若写了"没有登记过回访修订",',
+    '    那是记录上的事实,可以据此问该怎么核对它,但仍然不许替她断言它已经凉了',
+    '  · 反面——点出这条最可能在哪个前提上站不住;反对意见本身留给她去问',
+    '  · 落地——放到她现在的项目上会动哪一处',
+    '  · 关联——和她研究过的别的东西能不能接上',
+    '  · 盲区——这页只讲了哪一面,范围外还该看什么',
+    '  正文里已经回答过的问题别原样再问;要问就问它今天还成不成立,或者正文没碰到的地方。',
+    ...FOLLOWUP_BREVITY_RULES,
     ...FOLLOWUP_JUDGMENT_RULES,
     '  必须带这页里的具体抓手(名字、概念、数字、时间),',
     '  不许写成"这个到今天还成立吗""和我的项目有什么关系"这种放之四海皆可的空问。',
@@ -105,12 +115,18 @@ async function generateHippoCardOnce(input, opts = {}) {
   if (dropped.length) onNote?.(`[hippo] 丢弃 ${dropped.length} 条模型占位残留: ${clipForLog(JSON.stringify(dropped))}`);
   const badFollowups = describeBadFollowups(followups);
   if (badFollowups) { onFail?.(`[hippo] 条子没写成: ${badFollowups}`); return null; }
+  const kept = followups.slice(0, MAX_FOLLOWUPS).map((f) => stripWikilinks(f.trim()));
+  // 影子期检查(2026-09-19):只写日志,不拦、不重试——拦下来只能走兜底通用问题,比漏一条更糟。
+  const leaks = describeVoiceLeaks(kept);
+  if (leaks.length) onNote?.(`[hippo] 口吻检查(影子期,只记录): ${leaks.join(' / ')}`);
+  const overlong = describeOverlong(kept);
+  if (overlong.length) onNote?.(`[hippo] 写短检查(影子期,只记录): ${overlong.join(' / ')}`);
   return {
-    cardTitle: truncate(raw.cardTitle.trim(), 30),
-    cardBody: truncate(raw.cardBody.trim(), 140),
-    // 单条不截断,理由同 book-gen:砍字数等于砍掉限定条件
-    followups: followups.slice(0, 8).map((f) => f.trim()),
-    mutter: truncate(raw.mutter.trim(), 40),
+    cardTitle: truncate(stripWikilinks(raw.cardTitle.trim()), 30),
+    cardBody: truncate(stripWikilinks(raw.cardBody.trim()), 140),
+    // 单条不截断,理由同 book-gen:砍字数等于砍掉限定条件(写短靠 prompt,不靠截断)
+    followups: kept,
+    mutter: truncate(stripWikilinks(raw.mutter.trim()), 40),
   };
 }
 
