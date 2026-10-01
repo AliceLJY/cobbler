@@ -11,7 +11,7 @@ export function parseFrontmatter(raw) {
   const end = raw.indexOf('\n---', 3);
   if (end === -1) return out;
   for (const line of raw.slice(3, end).split('\n')) {
-    const m = line.match(/^(title|type|created|updated):\s*(.+)$/);
+    const m = line.match(/^(title|type|created|updated|revisit):\s*(.+)$/);
     if (m) out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
   }
   return out;
@@ -105,6 +105,11 @@ export function parsePage(raw, fileName, dir) {
     revisited: (fm.created && fm.updated)
       ? (fm.created === fm.updated ? 'never' : fm.updated)
       : null,
+    // 页面自己声明「不用回访」（2026-10-01 加）：frontmatter 写 `revisit: false` 的页不进扭蛋池。
+    // 缘由：知识库里有一类取用型页面（提示词、制作工艺、素材作者），要用的时候去查就算用上了，
+    // 抽出来回访没有意义——10-01 抽中的是一个只记了一条短片的作者页。判断留在页面那边做，
+    // 这里只认这一个字段，不按标签或标题猜类别。只有明写 false 才排除；缺字段、写别的值都照常进池。
+    noRevisit: fm.revisit === 'false',
     summary: extractSummary(raw),
     excerpt: extractExcerpt(raw),
   };
@@ -128,8 +133,10 @@ export async function listHippoPages(hippoDir) {
 
 export function pickHippoPage(pages, history, rng = Math.random) {
   const seen = new Set(history);
-  const fresh = pages.filter((p) => !seen.has(p.file) && p.summary);
-  const pool = fresh.length ? fresh : pages.filter((p) => p.summary);
+  // noRevisit 在两个池里都要挡：只挡 fresh 的话，全抽过一轮后的回退池会把它们放回来。
+  const eligible = pages.filter((p) => p.summary && !p.noRevisit);
+  const fresh = eligible.filter((p) => !seen.has(p.file));
+  const pool = fresh.length ? fresh : eligible;
   if (!pool.length) return null;
   return pool[Math.floor(rng() * pool.length)];
 }

@@ -154,3 +154,31 @@ test('extractExcerpt 找不到合适换行就按上限硬切,标记照写', () =
   const out = extractExcerpt(body, 100);
   assert.ok(out.startsWith('字'.repeat(100) + '\n…[节选到 100 字 / 全页 500 字]'));
 });
+
+// ---- revisit: false 的页不进扭蛋池（2026-10-01 加）----
+// 缘由：10-01 抽中一个素材作者的实体页（只记了一条短片），这类取用型页面回访没有意义。
+
+test('parsePage: frontmatter 写 revisit: false → noRevisit=true;缺字段或写别的值都照常进池', () => {
+  // 形状照抄 10-01 被抽中的那页:行内数组 tags、title 带引号
+  const marked = '---\ntype: entity\nrevisit: false\ntitle: "OscarAI"\ncreated: 2026-09-27\nupdated: 2026-09-27\ntags: [visual-creator, personal-harness]\n---\n\nX账号,发布铅笔小人短片。\n';
+  assert.equal(parsePage(marked, 'OscarAI.md', 'entities').noRevisit, true);
+  const plain = '---\ntype: entity\ntitle: "OscarAI"\n---\n\n正文。\n';
+  assert.equal(parsePage(plain, 'OscarAI.md', 'entities').noRevisit, false);
+  const other = '---\ntype: entity\nrevisit: true\n---\n\n正文。\n';
+  assert.equal(parsePage(other, 'X.md', 'entities').noRevisit, false);
+  // 正文里出现同样的字不算数,只认 frontmatter
+  const inBody = '---\ntype: entity\n---\n\nrevisit: false\n';
+  assert.equal(parsePage(inBody, 'Y.md', 'entities').noRevisit, false);
+});
+
+test('pickHippoPage: noRevisit 的页抽不到,全抽过一轮回退全池时也抽不到', () => {
+  const pages = [
+    { file: 'craft', summary: 's', noRevisit: true },
+    { file: 'a', summary: 's', noRevisit: false },
+  ];
+  for (const r of [0, 0.5, 0.99]) assert.equal(pickHippoPage(pages, [], () => r).file, 'a');
+  // a 已抽过 → 回退池里仍然只有 a,不能把 craft 放回来
+  assert.equal(pickHippoPage(pages, ['a'], () => 0).file, 'a');
+  // 整池都标了不回访 → null,不硬抽
+  assert.equal(pickHippoPage([{ file: 'craft', summary: 's', noRevisit: true }], []), null);
+});
