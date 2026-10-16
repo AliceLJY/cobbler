@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { listHippoPages, pickHippoPage } from './lib/hippo-pick.js';
 import { generateHippoCard, fallbackHippoCard } from './lib/hippo-gen.js';
-import { sendTelegramMessage, formatHippoCardText } from './lib/tg-send.js';
+import { sendTelegramMessage, formatHippoCardText, hippoFollowupBody } from './lib/tg-send.js';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
 import { localDateISO } from './lib/dates.js';
 import { notifyFailure, shortHostname, firstLine } from './lib/notify-fail.js';
@@ -56,7 +56,7 @@ export async function runHippoCard(cfg) {
   // 卡片已写进 data/hippo-cards,抛错走 hippoCardMain 的失败出口(退出码 1 + TG 报警)。
   const tg = await readJSON(join(dataDir, 'tg.json'), null);
   if (!tg?.token || !tg?.chatId) throw new Error('tg.json 缺 token/chatId，卡片已写 data/hippo-cards 未送达');
-  await send({ token: tg.token, chatId: tg.chatId, text: formatHippoCardText(card, todayISO) });
+  await send({ token: tg.token, chatId: tg.chatId, text: formatHippoCardText(card, todayISO), preTail: hippoFollowupBody(card) });
   return { ...card, delivered: 'tg' };
 }
 

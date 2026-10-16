@@ -29,10 +29,10 @@ test('latestHippoCard 取日期最新一张', async () => {
   });
 });
 
-test('本人消息 → 回条子(含路径与问题)', async () => {
+test('本人消息 → 回条子(含路径与追更三步)', async () => {
   await withDataDir([CARD], async (dir) => {
     const r = await handleUpdate({ message: { text: '想深挖', chat: { id: 8315648213 } } }, { chatId: 8315648213, dataDir: dir });
-    assert.ok(r.includes('entities/MediaPipe.md') && r.includes('1. F1'));
+    assert.ok(r.includes('entities/MediaPipe.md') && r.includes('追更') && !r.includes('1. F1'));
   });
 });
 

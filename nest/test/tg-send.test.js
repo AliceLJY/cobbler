@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sendTelegramMessage, sendTelegramPhoto, splitForTelegram, formatHippoCardText, formatFollowupText, formatBookCardText, formatBookFollowupText } from '../lib/tg-send.js';
+import { sendTelegramMessage, sendTelegramPhoto, splitForTelegram, formatHippoCardText, formatFollowupText, formatBookCardText, formatBookFollowupText, hippoFollowupBody } from '../lib/tg-send.js';
 
 const ok = { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 1 } }) };
 const bad = { ok: false, status: 502, json: async () => ({ ok: false, description: 'bad gateway' }) };
@@ -28,7 +28,7 @@ test('重试耗尽 → throw;缺 token → throw', async () => {
   await assert.rejects(sendTelegramMessage({ token: '', chatId: 1, text: 'x' }), /missing token/);
 });
 
-test('formatHippoCardText 纯文本简介卡,并直接带上条子', () => {
+test('formatHippoCardText 纯文本简介卡,并直接带上追更条子(2026-10-17 起不列模型出的问题)', () => {
   const text = formatHippoCardText(
     { pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md', body: 'B', followups: ['F1', 'F2', 'F3'], mutter: 'M' },
     '2026-07-05',
@@ -36,21 +36,48 @@ test('formatHippoCardText 纯文本简介卡,并直接带上条子', () => {
   assert.ok(text.startsWith('🥚 知识扭蛋 · 7月5日'));
   assert.ok(text.includes('「MediaPipe」'));
   assert.ok(text.includes('—— M'));
-  // 条子直接进卡,不再让她回一句要
   assert.ok(!text.includes('回我一下'));
-  assert.ok(text.includes('1. F1') && text.includes('2. F2') && text.includes('3. F3'));
   assert.ok(text.includes('wiki/entities/MediaPipe.md'));
-  assert.ok(text.includes('不要生造事实'));
-  // 接条子的大模型要知道「(Cobbler 猜:…)」不是她的判断
-  assert.ok(text.includes('Cobbler 猜') && text.includes('不是我的判断'));
+  // 追更三步:来源动静 / 还在不在用 / 默认不用改
+  assert.ok(text.includes('追更') && text.includes('不是挑错'));
+  assert.ok(text.includes('来源有没有新动静') && text.includes('还在不在用'));
+  assert.ok(text.includes('默认结论是「不用改」'));
+  assert.ok(text.includes('不要生造'));
+  // 模型出的挑错式问题不再进条子(复盘:24 次扭蛋 100% 改 hippo,问题本身在要求挑错)
+  assert.ok(!text.includes('F1') && !text.includes('F2'));
   assert.ok(!text.includes('*') && !text.includes('#'));
+  // 卡的最后一段就是条子本体,发送时据此加代码块
+  assert.ok(text.endsWith(hippoFollowupBody({ pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md' })));
 });
 
-test('formatFollowupText 条子含页面路径和问题', () => {
+test('formatFollowupText 追更条子含页面路径、标题和默认不用改', () => {
   const text = formatFollowupText({ pageTitle: 'MediaPipe', pageFile: 'entities/MediaPipe.md', followups: ['F1', 'F2'] });
   assert.ok(text.includes('wiki/entities/MediaPipe.md'));
-  assert.ok(text.includes('1. F1') && text.includes('2. F2'));
   assert.ok(text.includes('「MediaPipe」'));
+  assert.ok(text.includes('不用改'));
+  assert.ok(!text.includes('1. F1'));
+});
+
+test('sendTelegramMessage 带 preTail:结尾那段作为代码块,offset/length 按 UTF-16 算', async () => {
+  let captured;
+  const fetchImpl = async (url, init) => { captured = JSON.parse(init.body); return ok; };
+  const tail = '复制我:中文和 emoji 🥚 混排';
+  const text = `🥚 卡面\n\n${tail}`;
+  await sendTelegramMessage({ token: 't', chatId: 1, text, preTail: tail }, { fetchImpl });
+  assert.deepEqual(captured.entities, [{ type: 'pre', offset: text.length - tail.length, length: tail.length }]);
+  // 校准:按字节或按码点算都会和 UTF-16 对不上(🥚 占 2 个 UTF-16 单位)
+  assert.notEqual(text.length, [...text].length);
+});
+
+test('sendTelegramMessage:preTail 不在结尾 / 不传 / 被拆条 → 不加代码块', async () => {
+  const bodies = [];
+  const fetchImpl = async (url, init) => { bodies.push(JSON.parse(init.body)); return ok; };
+  await sendTelegramMessage({ token: 't', chatId: 1, text: 'A\nB', preTail: 'A' }, { fetchImpl });
+  await sendTelegramMessage({ token: 't', chatId: 1, text: 'A\nB' }, { fetchImpl });
+  const long = `${'x'.repeat(4000)}\n${'y'.repeat(200)}`;
+  await sendTelegramMessage({ token: 't', chatId: 1, text: long, preTail: 'y'.repeat(200) }, { fetchImpl });
+  assert.equal(bodies.length, 4);
+  assert.ok(bodies.every((b) => b.entities === undefined));
 });
 
 test('sendTelegramPhoto 打 sendPhoto 端点,带 photo+caption', async () => {
@@ -159,7 +186,8 @@ test('fallback 卡在条子上方标出「这组是兜底问题」,正常卡不�
   assert.ok(marked.includes('兜底的通用问题'));
   assert.ok(!formatBookCardText(BCARD, '2026-07-11').includes('兜底的通用问题'));
 
+  // 知识扭蛋 10-17 起条子是固定的追更三步,不再用模型出的问题,所以兜底与否条子都一样、不再标
   const hCard = { pageTitle: 'P', pageFile: 'concepts/P.md', body: 'B', mutter: 'M', followups: ['F1', 'F2', 'F3'] };
-  assert.ok(formatHippoCardText({ ...hCard, fallback: true }, '2026-07-05').includes('兜底的通用问题'));
+  assert.ok(!formatHippoCardText({ ...hCard, fallback: true }, '2026-07-05').includes('兜底的通用问题'));
   assert.ok(!formatHippoCardText(hCard, '2026-07-05').includes('兜底的通用问题'));
 });

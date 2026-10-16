@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pickBookExcerpt } from './lib/book-pick.js';
 import { generateBookCard, fallbackBookCard } from './lib/book-gen.js';
-import { sendTelegramMessage, formatBookCardText } from './lib/tg-send.js';
+import { sendTelegramMessage, formatBookCardText, bookFollowupBody } from './lib/tg-send.js';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
 import { localDateISO } from './lib/dates.js';
 import { notifyFailure, shortHostname, firstLine } from './lib/notify-fail.js';
@@ -53,7 +53,7 @@ export async function runBookCard(cfg) {
   // 卡片已写进 data/book-cards,抛错走 bookCardMain 的失败出口(退出码 1 + TG 报警)。
   const tg = await readJSON(join(dataDir, 'tg.json'), null);
   if (!tg?.token || !tg?.chatId) throw new Error('tg.json 缺 token/chatId，卡片已写 data/book-cards 未送达');
-  await send({ token: tg.token, chatId: tg.chatId, text: formatBookCardText(card, todayISO) });
+  await send({ token: tg.token, chatId: tg.chatId, text: formatBookCardText(card, todayISO), preTail: bookFollowupBody(card) });
   return { ...card, delivered: 'tg' };
 }
 

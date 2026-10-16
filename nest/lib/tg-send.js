@@ -46,11 +46,18 @@ export function splitForTelegram(text, limit = TG_TEXT_LIMIT) {
   return parts;
 }
 
-export async function sendTelegramMessage({ token, chatId, text }, opts = {}) {
+// preTail:消息结尾那段要作为代码块发(Telegram 给代码块配复制按钮,她点一下就复制走整段条子,2026-10-17)。
+// JS 字符串下标本身就是 UTF-16 单位,正好是 Telegram entities 要的 offset/length。
+// 消息被拆成多条时不加代码块(拆开的条子本来就没法一次复制),照旧按纯文本发,不让格式问题挡住送达。
+export async function sendTelegramMessage({ token, chatId, text, preTail }, opts = {}) {
   if (!token || !chatId) throw new Error('tg-send: missing token/chatId');
+  const parts = splitForTelegram(text);
+  const usePre = parts.length === 1 && preTail && text.endsWith(preTail);
   let last;
-  for (const part of splitForTelegram(text)) {
-    last = await callTelegram({ token, method: 'sendMessage', body: { chat_id: chatId, text: part } }, opts);
+  for (const part of parts) {
+    const body = { chat_id: chatId, text: part };
+    if (usePre) body.entities = [{ type: 'pre', offset: text.length - preTail.length, length: preTail.length }];
+    last = await callTelegram({ token, method: 'sendMessage', body }, opts);
   }
   return last;
 }
@@ -68,18 +75,18 @@ const DEFAULT_HIPPO_DIR = process.env.COBBLER_HIPPO_DIR || '~/knowledge-vault';
 // 光在出题那头标还不够:她整段转给大模型,对方看到的仍是一句猜测,这一行告诉它别顺着答。
 const COBBLER_GUESS_NOTE = '条子里若有「(Cobbler 猜:……)」,那是出题的 Cobbler 自己的猜测,不是我的判断,请独立判断,别顺着它答。';
 
-// 条子正文:wiki 页路径 + 问题清单 + 防编造要求。卡和"再要一次"的回复共用,避免漂移。
-function hippoFollowupBody(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {
-  const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
+// 条子正文:2026-10-17 起改成「追更」——Alice:「这种借鉴就是追更嘛,追完之后写回这个索引」。
+// 之前条子问「前提哪里站不住」「当时靠什么支撑」,排障复盘统计 24 次知识扭蛋 100% 都改了 hippo,
+// 而被改的页多数没有下游在用:问题本身在要求挑错。现在不再列模型出的问题,改成固定三步,默认结论「不用改」。
+// 卡和"再要一次"的回复共用,避免漂移。整段作为代码块发,她只需要点复制。
+export function hippoFollowupBody(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {
   return [
-    `请读 ${hippoDirDisplay}/wiki/${card.pageFile},这是我自己研究过存下来的一页。`,
-    `读完再逐条回答(页:「${card.pageTitle}」):`,
-    '',
-    qs,
-    '',
-    COBBLER_GUESS_NOTE,
-    '逐条答,结合这页原文和我现在的项目说,别泛泛。能给具体人名、项目名、年份、',
-    '数字的地方就给;拿不准的明确标"不确定",不要生造事实——编一条我整份都不用。',
+    `知识扭蛋追更:请读 ${hippoDirDisplay}/wiki/${card.pageFile}(「${card.pageTitle}」),这是我以前研究过存下来的一页。`,
+    '这是一次追更,不是挑错。按三步走:',
+    '1. 来源有没有新动静:从这页的 frontmatter 和正文里找它借鉴的来源(仓库、文章、作者)。仓库看入库之后有没有新版本或重要提交,文章看作者有没有写后续。这页没有来源链接,就改查这个说法最近有没有新的讨论或反例。',
+    '2. 我们还在不在用:这页的结论现在在我的系统里还在不在用(搜规则文件、skill、hippo 里引用它的页),有没有被别的方案取代。',
+    '3. 默认结论是「不用改」:前两步都没有新东西,就回一句「没变化,不用改」结束,不要顺手改措辞、补内容。只有拿得出新证据(新版本号、新文章链接、已被取代的具体位置),才更新这一页,按 hippo-wiki 的扭蛋回写规约写回并装订。',
+    '最后用一两句话告诉我结论。拿不准的标「不确定」,不要生造版本号和链接。',
   ].join('\n');
 }
 
@@ -96,10 +103,7 @@ export function formatHippoCardText(card, dateISO, hippoDirDisplay = DEFAULT_HIP
     `—— ${card.mutter}`,
     '',
     '━━━━━━━━━━',
-    ...(card.fallback
-      ? ['(今天模型没写成条子,下面这组是兜底的通用问题,不针对这一页。)', '']
-      : []),
-    '条子拿好,整段复制发给隔壁大个子:',
+    '下面整段点复制,发给隔壁大个子:',
     '',
     hippoFollowupBody(card, hippoDirDisplay),
   ].join('\n');
@@ -136,7 +140,7 @@ export function formatBookCardText(card, dateISO, ebookReader = DEFAULT_EBOOK_RE
     ...(card.fallback
       ? ['(今天模型没写成条子,下面这组是兜底的通用问题,不针对这本书。)', '']
       : []),
-    '条子拿好,整段复制发给隔壁大个子:',
+    '下面整段点复制,发给隔壁大个子:',
     '',
     bookFollowupBody(card, ebookReader),
   ].join('\n');
@@ -150,7 +154,7 @@ const DEFAULT_EBOOK_READER = 'python3 ~/Downloads/sync-bridge/scripts-bin/ebook-
 
 // 条子正文:mini 统一读书命令 + 问题清单 + 防编造要求。
 // 每天自动推的卡和"再要一次"的回复共用这一份,避免两处漂移。
-function bookFollowupBody(card, ebookReader = DEFAULT_EBOOK_READER) {
+export function bookFollowupBody(card, ebookReader = DEFAULT_EBOOK_READER) {
   const qs = (card.followups ?? []).map((f, i) => `${i + 1}. ${f}`).join('\n');
   const anchor = card.quote ? ` --grep ${shellQuote(card.quote.slice(0, 40))} --context 8` : '';
   const command = `${ebookReader} --book ${shellQuote(card.bookDir)} --chapter 'FULL.md'${anchor}`;
