@@ -72,7 +72,7 @@ export async function bookCardMain(cfg, io = {}) {
   } catch (e) {
     err(`[cobbler-book] ${new Date().toISOString()} fail`, e);
     process.exitCode = 1;
-    await notify(`书堆扭蛋 10:45 失败@${shortHostname()}：${firstLine(e)}；日志 ~/Projects/cobbler/nest/data/book.log`, { log: err });
+    await notify(`书堆扭蛋 07:40 失败@${shortHostname()}：${firstLine(e)}；日志 ~/Projects/cobbler/nest/data/book.log`, { log: err });
     return null;
   }
 }

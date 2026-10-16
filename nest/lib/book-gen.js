@@ -14,7 +14,7 @@ export function buildBookPrompt({ persona, book, excerpt }) {
   return [
     persona,
     '',
-    '今天上午是"书堆扭蛋"时间:她攒了三百多本中外的书在库里,大多买了没读完。',
+    '今天一早是"书堆扭蛋"时间:她攒了三百多本中外的书在库里,大多买了没读完。',
     '你每天从书堆里叼一本,翻到中间随便一段,讲给她听——不劝学,就是让她尝一口这本书的味道。',
     UNTRUSTED_SOURCE_NOTICE,
     `今天叼到的一本:《${book.title}》${book.author ? `,作者 ${book.author}` : ''}`,

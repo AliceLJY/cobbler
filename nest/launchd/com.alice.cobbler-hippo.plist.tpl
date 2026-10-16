@@ -9,7 +9,14 @@
     <string>__HOME__/Projects/cobbler/nest/hippo-card.js</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+  <!-- 只在工作日发（10-17 Alice：周末不想管） -->
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
   <key>WorkingDirectory</key><string>__HOME__/Projects/cobbler/nest</string>
   <key>StandardOutPath</key><string>__HOME__/Projects/cobbler/nest/data/hippo.log</string>
   <key>StandardErrorPath</key><string>__HOME__/Projects/cobbler/nest/data/hippo.log</string>

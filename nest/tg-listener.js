@@ -22,7 +22,7 @@ export async function latestHippoCard(dataDir) {
   return hit ? readJSON(hit.file, null) : null;
 }
 
-// 扭蛋管线里取"最新投喂"的一张:先比日期,同日比 mtime(book 10:45 → hippo 11:00；10-17 前是 12:30 → 21:00)
+// 扭蛋管线里取"最新投喂"的一张:先比日期,同日比 mtime(book 07:40 → hippo 11:00；10-17 前是 12:30 → 21:00)
 const CARD_DIRS = ['hippo-cards', 'book-cards'];
 
 export async function latestCard(dataDir) {
