@@ -73,7 +73,7 @@ test('book 卡最新 → 回 book 条子(带 mini 统一查询命令)', async ()
   });
 });
 
-test('同日两张卡 → mtime 晚的胜(hippo 11:00 晚于 book 07:40)', async () => {
+test('同日两张卡 → mtime 晚的胜(hippo 08:00 晚于 book 07:40)', async () => {
   await withDataDir([], async (dir) => {
     await mkdir(join(dir, 'book-cards'), { recursive: true });
     await writeFile(join(dir, 'book-cards', '2026-07-05.json'), JSON.stringify(BOOK_CARD));

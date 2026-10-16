@@ -81,7 +81,7 @@ export function describeOverlong(followups, limit = OVERLONG_FOLLOWUP_CHARS) {
 // cobbler 是无人值守任务,不吃 ~/.claude/settings.json 的全局默认模型——那是 Alice
 // 交互用的、会随手改。2026-08-30 事故:全局默认当时是 Fable 5,那天 Fable 5 额度用尽,
 // `claude -p` 只回一句「You've reached your Fable 5 limit」,parseClaudeJSON 拿不到 JSON,
-// 两条扭蛋(当时 12:30 书堆 / 21:00 hippo，10-17 起改到上午 07:40 / 11:00)同日双双降级发废卡。
+// 两条扭蛋(当时 12:30 书堆 / 21:00 hippo，10-17 起改到工作日早上 07:40 / 08:00)同日双双降级发废卡。
 // ⚠️ 退出码不可作判据:同一种限额错误,这里实测拿到 0(execFile 因此不抛异常),
 // 而同日 skill-first-layer-doctor 用 subprocess 拿到的是 1。两种都要能兜住,
 // 所以下面的 onFail 把「抛异常」和「没抛但输出不是 JSON」分别留痕。
