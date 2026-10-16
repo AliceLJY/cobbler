@@ -9,7 +9,7 @@
     <string>__HOME__/Projects/cobbler/nest/hippo-card.js</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+  <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
   <key>WorkingDirectory</key><string>__HOME__/Projects/cobbler/nest</string>
   <key>StandardOutPath</key><string>__HOME__/Projects/cobbler/nest/data/hippo.log</string>
   <key>StandardErrorPath</key><string>__HOME__/Projects/cobbler/nest/data/hippo.log</string>

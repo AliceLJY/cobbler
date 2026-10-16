@@ -17,8 +17,8 @@ Mac mini (the nest)                             Android phone (the body)
 ┌────────────────────────────────────┐          ┌──────────────────────┐
 │ Three scheduled feeds              │          │ Expo app              │
 │  07:30 personal history → app card │  HTTPS   │  animated pet stage   │
-│  12:30 local book → Telegram       │◄─────────│  local sensor play    │
-│  21:00 knowledge page → Telegram   │Tailscale │  cards + diary drawer │
+│  10:45 local book → Telegram       │◄─────────│  local sensor play    │
+│  11:00 knowledge page → Telegram   │Tailscale │  cards + diary drawer │
 │                                    │          │  offline cache        │
 │                                    │          └──────────────────────┘
 │ Two keep-alive processes           │

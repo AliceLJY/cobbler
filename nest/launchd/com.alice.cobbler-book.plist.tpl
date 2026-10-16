@@ -9,7 +9,7 @@
     <string>__HOME__/Projects/cobbler/nest/book-card.js</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>30</integer></dict>
+  <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>45</integer></dict>
   <key>WorkingDirectory</key><string>__HOME__/Projects/cobbler/nest</string>
   <key>StandardOutPath</key><string>__HOME__/Projects/cobbler/nest/data/book.log</string>
   <key>StandardErrorPath</key><string>__HOME__/Projects/cobbler/nest/data/book.log</string>

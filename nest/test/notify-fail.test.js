@@ -144,7 +144,7 @@ test('book-sendfail:sendImpl 抛 ECONNRESET → 卡片已写、1 条报警、退
   assert.ok(await exists(join(f.dataDir, 'book-cards', '2026-09-17.json')), '卡片文件要先落地,报警说的「卡片已写」才是真的');
   assert.equal(await ntg(f.tgLog), 1);
   const tg = await tgText(f.tgLog);
-  assert.ok(tg.startsWith(`书堆扭蛋 12:30 失败@${shortHostname()}：`), tg);
+  assert.ok(tg.startsWith(`书堆扭蛋 10:45 失败@${shortHostname()}：`), tg);
   assert.ok(tg.includes('ECONNRESET') && tg.includes('日志 ~/Projects/cobbler/nest/data/book.log'), tg);
   assert.ok(r.err.length >= 1 && /^\[cobbler-book\] \S+ fail/.test(r.err[0]) && ISO_RE.test(r.err[0]), r.err[0]);
   assert.equal(r.out.length, 0, '失败时不许再打 ok 行');
@@ -211,7 +211,7 @@ test('hippo-sendfail:sendImpl 抛 ECONNRESET → 卡片已写、1 条报警、�
   assert.ok(await exists(join(f.dataDir, 'hippo-cards', '2026-09-17.json')));
   assert.equal(await ntg(f.tgLog), 1);
   const tg = await tgText(f.tgLog);
-  assert.ok(tg.startsWith(`知识扭蛋 21:00 失败@${shortHostname()}：`) && tg.includes('ECONNRESET') && tg.includes('日志 ~/Projects/cobbler/nest/data/hippo.log'), tg);
+  assert.ok(tg.startsWith(`知识扭蛋 11:00 失败@${shortHostname()}：`) && tg.includes('ECONNRESET') && tg.includes('日志 ~/Projects/cobbler/nest/data/hippo.log'), tg);
   assert.ok(/^\[cobbler-hippo\] \S+ fail/.test(r.err[0]) && ISO_RE.test(r.err[0]), r.err[0]);
   t.diagnostic(`TG 样张(hippo-sendfail): ${tg.replace(/\n<<<END>>>\n$/, '')}`);
 });
@@ -299,7 +299,7 @@ test('新版 CLI·无 tg.json → 退出码 1、1 条报警各含「tg.json 缺 
   assert.ok(/\[cobbler-hippo\] \S+ fail/.test(h.stderr) && ISO_RE.test(h.stderr) && h.stderr.includes('tg.json 缺 token/chatId'), h.stderr);
   assert.equal(await ntg(tree.tgLog), 2);
   const tg = await tgText(tree.tgLog);
-  assert.ok(tg.includes('书堆扭蛋 12:30 失败@') && tg.includes('知识扭蛋 21:00 失败@') && tg.includes('日志 ~/Projects/cobbler/nest/data/hippo.log'), tg);
+  assert.ok(tg.includes('书堆扭蛋 10:45 失败@') && tg.includes('知识扭蛋 11:00 失败@') && tg.includes('日志 ~/Projects/cobbler/nest/data/hippo.log'), tg);
   for (const line of tg.split('\n').filter((l) => l && l !== '<<<END>>>')) t.diagnostic(`TG 样张(新版 CLI 无 tg.json): ${line}`);
   t.diagnostic(`日志样张(新版 CLI 无 tg.json): ${b.stderr.split('\n')[0]}`);
 });

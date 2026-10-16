@@ -72,7 +72,7 @@ export async function hippoCardMain(cfg, io = {}) {
   } catch (e) {
     err(`[cobbler-hippo] ${new Date().toISOString()} fail`, e);
     process.exitCode = 1;
-    await notify(`知识扭蛋 21:00 失败@${shortHostname()}：${firstLine(e)}；日志 ~/Projects/cobbler/nest/data/hippo.log`, { log: err });
+    await notify(`知识扭蛋 11:00 失败@${shortHostname()}：${firstLine(e)}；日志 ~/Projects/cobbler/nest/data/hippo.log`, { log: err });
     return null;
   }
 }
