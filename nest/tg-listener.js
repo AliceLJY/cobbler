@@ -3,6 +3,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
 import { sendTelegramMessage, formatFollowupText, formatBookFollowupText } from './lib/tg-send.js';
+// 2026-10-20：launchd 日志没有时间戳，看不出 poll 失败 / 自退重连发生在几点；统一给 console 加 ISO 时间前缀
+for (const k of ['log', 'error', 'warn']) {
+  const orig = console[k].bind(console);
+  console[k] = (...args) => orig(new Date().toISOString(), ...args);
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
