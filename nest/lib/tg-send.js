@@ -78,7 +78,7 @@ const COBBLER_GUESS_NOTE = '条子里若有「(Cobbler 猜:……)」,那是出�
 // 条子正文:2026-10-17 起改成「追更」——Alice:「这种借鉴就是追更嘛,追完之后写回这个索引」。
 // 之前条子问「前提哪里站不住」「当时靠什么支撑」,排障复盘统计 24 次知识扭蛋 100% 都改了 hippo,
 // 而被改的页多数没有下游在用:问题本身在要求挑错。现在不再列模型出的问题,改成固定三步,默认结论「不用改」。
-// 卡和"再要一次"的回复共用,避免漂移。整段作为代码块发,她只需要点复制。
+// 卡和"再要一次"的回复共用,避免漂移。整段作为代码块发:iPhone 上代码块没有复制按钮,轻点方框即整段复制(2026-10-22 Alice 实测)。
 export function hippoFollowupBody(card, hippoDirDisplay = DEFAULT_HIPPO_DIR) {
   return [
     `知识扭蛋追更:请读 ${hippoDirDisplay}/wiki/${card.pageFile}(「${card.pageTitle}」),这是我以前研究过存下来的一页。`,
@@ -103,7 +103,7 @@ export function formatHippoCardText(card, dateISO, hippoDirDisplay = DEFAULT_HIP
     `—— ${card.mutter}`,
     '',
     '━━━━━━━━━━',
-    '下面整段点复制,发给隔壁大个子:',
+    '轻点下面方框就整段复制,发给隔壁大个子:',
     '',
     hippoFollowupBody(card, hippoDirDisplay),
   ].join('\n');
@@ -140,7 +140,7 @@ export function formatBookCardText(card, dateISO, ebookReader = DEFAULT_EBOOK_RE
     ...(card.fallback
       ? ['(今天模型没写成条子,下面这组是兜底的通用问题,不针对这本书。)', '']
       : []),
-    '下面整段点复制,发给隔壁大个子:',
+    '轻点下面方框就整段复制,发给隔壁大个子:',
     '',
     bookFollowupBody(card, ebookReader),
   ].join('\n');
