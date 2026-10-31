@@ -66,7 +66,8 @@ test('pickOutputBatch 先抽没露过面的里最老的，全露过一轮再按�
 });
 
 test('formatOutputCardText 带批次名、在等什么、剩余数、可复制条子', () => {
-  const card = { dir: '2026-10-05-a', date: '2026-10-05', note: '选一个方向往下挖' };
+  // card.date 是卡片日（今天），batchDate 才是产出日——10-31 真跑时曾把今天当产出日印成「0 天没人管」
+  const card = { dir: '2026-10-05-a', date: TODAY, batchDate: '2026-10-05', note: '选一个方向往下挖' };
   const text = formatOutputCardText(card, TODAY, 3);
   assert.match(text, /产出回捞 · 10月31日/);
   assert.match(text, /26 天没人管了/);

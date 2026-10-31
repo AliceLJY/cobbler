@@ -25,8 +25,8 @@ export function outputFollowupBody(card, outputDisplay = DEFAULT_OUTPUT_DISPLAY)
 
 export function formatOutputCardText(card, todayISO, poolSize, outputDisplay = DEFAULT_OUTPUT_DISPLAY) {
   const [, m, d] = todayISO.split('-');
-  const [, bm, bd] = card.date.split('-');
-  const age = daysBetween(card.date, todayISO);
+  const [, bm, bd] = card.batchDate.split('-');
+  const age = daysBetween(card.batchDate, todayISO);
   const rest = poolSize - 1;
   return [
     `🎁 产出回捞 · ${Number(m)}月${Number(d)}日`,
