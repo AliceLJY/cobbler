@@ -27,13 +27,27 @@ const SEVERITY = new Map([
 // Both sit in the Expo build / dev-server toolchain, not in what the app ships.
 // The same night `npm audit fix` (no --force) took the three findings that do
 // have fixes: compression 1.8.2, shell-quote 1.12.0, source-map-js 1.2.2.
-// Remove these two entries once braces / node-forge publish a fixed release.
+// (braces and node-forge entries removed 2026-10-31 once fixed releases landed.)
+//
+// 2026-10-31: node-forge published fixed releases, so `npm audit fix
+// --package-lock-only` (no --force) took them and GHSA-86W9-CPQP-85RV left the
+// list. One new high finding stays unfixable without a breaking Expo change
+// (npm's only suggestion is expo@51):
+//   GHSA-MRHX-C7XC-M3W5 zod <4.6.6 (memory exhaustion on oversized constrained
+//     collections), pulled in by @expo/cli — dev server / build toolchain, not
+//     shipped in the app. The app line is paused (see memory project_cobbler_app),
+//     nothing is being built or published from it. Remove once @expo/cli moves
+//     to zod >=4.6.6.
 export const ALLOWED_ADVISORIES = new Map([
   ["GHSA-W3RX-R6R6-PGPR", "high"],
   ["GHSA-5P2G-FCMC-QVQQ", "high"],
   ["GHSA-W5HQ-G745-H8PQ", "moderate"],
-  ["GHSA-VFJ7-8CJW-P6XM", "high"],
-  ["GHSA-86W9-CPQP-85RV", "high"],
+  ["GHSA-MRHX-C7XC-M3W5", "high"],
+  // Same @expo/cli chain, lower-severity leaves that npm lists alongside it
+  // (the package is reported "high" as a whole, so they must be named too):
+  ["GHSA-3G3M-2FJR-6PW4", "moderate"],
+  ["GHSA-G3HV-75WG-M249", "moderate"],
+  ["GHSA-GCQX-W48M-W2H4", "low"],
 ]);
 
 function advisoryId(via) {
