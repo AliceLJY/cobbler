@@ -120,3 +120,35 @@ test('池子空：退出码 0、不发、不报警；tg.json 缺凭证：退出�
   assert.match(notes[0], /产出回捞 08:20 失败@/);
   process.exitCode = 0;
 });
+
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { parsePoolTSV } from '../lib/output-pick.js';
+const pexec = promisify(execFile);
+
+test('bash 扫描脚本与 listOutputBatches 对同一夹具给出同样的池（launchd 下 node 读 Downloads 会卡，扫描交给 bash）', async () => {
+  const root = await fixture({
+    '2026-10-05-a': '# 标题\n\n**状态**：等Alice ｜ 选一个方向往下挖\n',
+    '2026-10-15-b': '# 没状态行',
+    '2026-10-20-c': null,
+    'no-date': '状态: 等Alice ｜ 没日期前缀',
+    '2026-10-29-d': '状态: 已完成 | 做完了\n状态: 等Alice ｜ 第二行不算',
+    '2026-10-30-e': '状态: 可清',
+  });
+  const { stdout } = await pexec('/bin/bash', [new URL('../output-card-scan.sh', import.meta.url).pathname, root]);
+  const fromBash = parsePoolTSV(stdout);
+  const fromNode = await listOutputBatches(root);
+  assert.deepEqual(fromBash, fromNode);
+  assert.deepEqual(fromBash.map((b) => [b.dir, b.status, b.note]), [
+    ['2026-10-05-a', '等Alice', '选一个方向往下挖'], ['2026-10-29-d', '已完成', '做完了'], ['2026-10-30-e', '可清', ''],
+  ]);
+});
+
+test('runOutputCard 走 poolFile 时不读 outputDir', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'cobbler-output-data-'));
+  const pool = join(dataDir, 'pool.tsv');
+  await writeFile(pool, '2026-10-05-a\t2026-10-05\t等Alice\t选方向\n2026-10-30-b\t2026-10-30\t等Alice\t太新\n');
+  const c = await runOutputCard({ outputDir: '/nonexistent/never-read', poolFile: pool, dataDir, todayISO: TODAY, dryRun: true, log: () => {} });
+  assert.equal(c.dir, '2026-10-05-a');
+  assert.equal(c.poolSize, 1);
+});

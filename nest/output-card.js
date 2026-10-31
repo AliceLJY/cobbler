@@ -1,12 +1,14 @@
 // 产出回捞卡（2026-10-31 立）：工作日 08:20 从 AI产出 里「状态: 等Alice」的批次抽一张发 TG，
 // 卡里带一段可复制给 CC 的条子，她回「做 / 不做了 / 晚点」，CC 改 README 状态行，池子靠她的回答自己变干净。
 // 零模型调用、零 token；池子空了就静默退出（退出码 0，不算失败）。
-// 用法: node output-card.js            正式跑（发 TG、写历史）
-//       node output-card.js --dry-run  只打印卡片文本，不发、不写历史
+// 用法: node output-card.js                 正式跑（发 TG、写历史），直扫 AI产出（只能在有磁盘权限的会话里跑）
+//       node output-card.js --pool <tsv>    读 output-card-scan.sh 扫好的池文件（launchd 走这条，见 output-card.sh）
+//       加 --dry-run                        只打印卡片文本，不发、不写历史
 // 环境: COBBLER_OUTPUT_DIR 覆盖 AI产出 路径（默认 ~/Downloads/sync-bridge/AI产出）
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listOutputBatches, pickOutputBatch, pendingBatches, daysBetween } from './lib/output-pick.js';
+import { listOutputBatches, parsePoolTSV, pickOutputBatch, pendingBatches, daysBetween } from './lib/output-pick.js';
+import { readFile } from 'node:fs/promises';
 import { sendTelegramMessage } from './lib/tg-send.js';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
 import { localDateISO } from './lib/dates.js';
@@ -46,11 +48,12 @@ export function formatOutputCardText(card, todayISO, poolSize, outputDisplay = D
 }
 
 export async function runOutputCard(cfg) {
-  const { outputDir, dataDir, todayISO, dryRun = false } = cfg;
+  const { outputDir, poolFile, dataDir, todayISO, dryRun = false } = cfg;
   const log = cfg.log ?? console.error;
   const send = cfg.sendImpl ?? sendTelegramMessage;
 
-  const batches = await listOutputBatches(outputDir);
+  // launchd 下走 poolFile（bash 扫好的 TSV，见 output-card.sh）；会话里手动跑可以直扫 outputDir
+  const batches = poolFile ? parsePoolTSV(await readFile(poolFile, 'utf8')) : await listOutputBatches(outputDir);
   const historyFile = join(dataDir, 'output-history.json');
   const history = await readJSON(historyFile, []);
   const pool = pendingBatches(batches, todayISO);
@@ -93,8 +96,18 @@ export async function outputCardMain(cfg, io = {}) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const HOME = process.env.HOME;
+  // 看门狗（10-31 加）：launchd 下 node 读 ~/Downloads 撞 TCC 会无声卡住，正常一次 2 秒内跑完；
+  // 120 秒没结束就当失败报警退出，不让它挂到天亮。unref 让它不拖住正常退出。
+  const WATCHDOG_MS = Number(process.env.COBBLER_OUTPUT_WATCHDOG_MS ?? 120000);
+  setTimeout(async () => {
+    console.error(`[cobbler-output] ${new Date().toISOString()} watchdog: ${WATCHDOG_MS}ms 没跑完，疑似卡在读 AI产出（TCC？）`);
+    await notifyFailure(`产出回捞 08:20 卡住@${shortHostname()}：${WATCHDOG_MS / 1000} 秒没跑完，疑似 launchd 下读 ~/Downloads 被 TCC 挡；日志 ~/Projects/cobbler/nest/data/output.log`);
+    process.exit(1);
+  }, WATCHDOG_MS).unref();
+  const pi = process.argv.indexOf('--pool');
   outputCardMain({
     outputDir: process.env.COBBLER_OUTPUT_DIR ?? `${HOME}/Downloads/sync-bridge/AI产出`,
+    poolFile: pi >= 0 ? process.argv[pi + 1] : undefined,
     dataDir: new URL('./data', import.meta.url).pathname,
     todayISO: localDateISO(),
     dryRun: process.argv.includes('--dry-run'),

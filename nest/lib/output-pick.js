@@ -43,6 +43,18 @@ export async function listOutputBatches(outputDir) {
   return out;
 }
 
+// 池文件（output-card-scan.sh 的 TSV：目录\t日期\t状态\t一句话）→ 与 listOutputBatches 同形的数组
+export function parsePoolTSV(text) {
+  const out = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const [dir, date, status, note = ''] = line.split('\t');
+    if (!dir || !date || !status) continue;
+    out.push({ dir, date, status, note: note.trim() });
+  }
+  return out;
+}
+
 export function pendingBatches(batches, todayISO, { minAgeDays = 2 } = {}) {
   return batches.filter((b) => b.status === '等Alice' && daysBetween(b.date, todayISO) >= minAgeDays);
 }

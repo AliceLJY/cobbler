@@ -4,9 +4,11 @@
 <dict>
   <key>Label</key><string>com.alice.cobbler-output</string>
   <key>ProgramArguments</key>
+  <!-- 入口是 bash 脚本不是 node：launchd 下 node 读 ~/Downloads 撞 TCC 无声卡死（10-31 探针：bash glob ok、
+       grep 子进程 ok、node 子进程 HANG），所以 output-card.sh 用 bash+grep 扫 README 写池文件，node 只读池文件发卡。 -->
   <array>
-    <string>__NODE__</string>
-    <string>__HOME__/Projects/cobbler/nest/output-card.js</string>
+    <string>/bin/bash</string>
+    <string>__HOME__/Projects/cobbler/nest/output-card.sh</string>
   </array>
   <key>StartCalendarInterval</key>
   <!-- 产出回捞（2026-10-31 立）：工作日 08:20，排在知识扭蛋 08:00 之后；周末不发同 hippo -->
