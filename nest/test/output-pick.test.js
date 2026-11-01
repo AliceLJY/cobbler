@@ -142,6 +142,10 @@ test('bash 扫描脚本与 listOutputBatches 对同一夹具给出同样的池�
   assert.deepEqual(fromBash.map((b) => [b.dir, b.status, b.note]), [
     ['2026-10-05-a', '等Alice', '选一个方向往下挖'], ['2026-10-29-d', '已完成', '做完了'], ['2026-10-30-e', '可清', ''],
   ]);
+  // launchd 下没有 LANG：C locale 里全角冒号那行也得扫到（11-01 夜间测试抓到漏行）
+  const { stdout: cOut } = await pexec('/bin/bash', [new URL('../output-card-scan.sh', import.meta.url).pathname, root],
+    { env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' } });
+  assert.deepEqual(parsePoolTSV(cOut), fromNode);
 });
 
 test('runOutputCard 走 poolFile 时不读 outputDir', async () => {
