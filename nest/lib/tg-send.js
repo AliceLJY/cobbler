@@ -49,17 +49,40 @@ export function splitForTelegram(text, limit = TG_TEXT_LIMIT) {
 // preTail:消息结尾那段要作为代码块发(Telegram 给代码块配复制按钮,她点一下就复制走整段条子,2026-10-17)。
 // JS 字符串下标本身就是 UTF-16 单位,正好是 Telegram entities 要的 offset/length。
 // 消息被拆成多条时不加代码块(拆开的条子本来就没法一次复制),照旧按纯文本发,不让格式问题挡住送达。
-export async function sendTelegramMessage({ token, chatId, text, preTail }, opts = {}) {
+// replyMarkup(决策卡的按钮)只挂在最后一段:返回值本来就是最后一段,调用方据此存 messageId 去改卡(2026-11-02)。
+export async function sendTelegramMessage({ token, chatId, text, preTail, replyMarkup }, opts = {}) {
   if (!token || !chatId) throw new Error('tg-send: missing token/chatId');
   const parts = splitForTelegram(text);
   const usePre = parts.length === 1 && preTail && text.endsWith(preTail);
   let last;
-  for (const part of parts) {
+  for (const [i, part] of parts.entries()) {
     const body = { chat_id: chatId, text: part };
     if (usePre) body.entities = [{ type: 'pre', offset: text.length - preTail.length, length: preTail.length }];
+    if (replyMarkup && i === parts.length - 1) body.reply_markup = replyMarkup;
     last = await callTelegram({ token, method: 'sendMessage', body }, opts);
   }
   return last;
+}
+
+// 按钮的「收到」:客户端只转圈约 15 秒,所以只试一次、3 秒超时,不吃 callTelegram 默认的 3×15 秒重试。
+export function answerCallback({ token, id, text }, opts = {}) {
+  const body = { callback_query_id: id, ...(text ? { text } : {}) };
+  return callTelegram({ token, method: 'answerCallbackQuery', body }, { retries: 1, timeoutMs: 3000, ...opts });
+}
+
+const EDIT_TEXT_LIMIT = 4000;
+
+// 改卡永远带 reply_markup:不带的话旧按钮会留在原处;默认空键盘 = 去掉按钮。
+// 「message is not modified」当成功;别的失败抛出,由调用方决定重试还是补发。
+export async function editMessage({ token, chatId, messageId, text, replyMarkup = { inline_keyboard: [] } }, opts = {}) {
+  const capped = text.length > EDIT_TEXT_LIMIT ? `${text.slice(0, EDIT_TEXT_LIMIT - 1)}…` : text;
+  const body = { chat_id: chatId, message_id: messageId, text: capped, reply_markup: replyMarkup };
+  try {
+    return await callTelegram({ token, method: 'editMessageText', body }, { retries: 1, timeoutMs: 8000, ...opts });
+  } catch (e) {
+    if (/message is not modified/i.test(String(e?.message))) return true;
+    throw e;
+  }
 }
 
 export async function sendTelegramPhoto({ token, chatId, photo, caption }, opts = {}) {

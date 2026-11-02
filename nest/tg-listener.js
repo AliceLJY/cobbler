@@ -1,8 +1,11 @@
 import { appendFile, readdir, stat } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJSON, writeJSONAtomic } from './lib/store.js';
-import { sendTelegramMessage, formatFollowupText, formatBookFollowupText } from './lib/tg-send.js';
+import { sendTelegramMessage, answerCallback, editMessage, formatFollowupText, formatBookFollowupText } from './lib/tg-send.js';
+import { handleCallback, settleDecisions, isPermanentTelegramError } from './lib/decision-flow.js';
 // 2026-10-20：launchd 日志没有时间戳，看不出 poll 失败 / 自退重连发生在几点；统一给 console 加 ISO 时间前缀
 for (const k of ['log', 'error', 'warn']) {
   const orig = console[k].bind(console);
@@ -39,11 +42,6 @@ export async function latestCard(dataDir) {
 
 const FOLLOWUP_FORMATTERS = { book: formatBookFollowupText };
 
-function isPermanentTelegramError(error) {
-  const status = Number(error?.telegramCode ?? error?.status);
-  return status >= 400 && status < 500 && status !== 429;
-}
-
 async function recordDeadLetter(dataDir, update, error) {
   const entry = {
     updateId: update.update_id,
@@ -63,6 +61,28 @@ export async function handleUpdate(update, { chatId, dataDir }) {
   return (FOLLOWUP_FORMATTERS[card.source] ?? formatFollowupText)(card);
 }
 
+// 批红卡点「发 / 不发」后叫醒的执行器(python3,读得了 ~/Downloads)。任务在跑时再 kickstart 是空操作、退出码 0(2026-11-02 实测)。
+export const RELEASE_LABEL = 'com.anxianjingya.autopub-release';
+const DEFAULT_OPS_DIR = process.env.AUTOPUB_LOGDIR || join(homedir(), 'ops-logs', 'autopub');
+
+function kickRelease() {
+  return new Promise((resolve) => {
+    execFile('/bin/launchctl', ['kickstart', `gui/${process.getuid()}/${RELEASE_LABEL}`], { timeout: 15000 },
+      (err) => resolve(err ? (typeof err.code === 'number' ? err.code : -1) : 0));
+  });
+}
+
+function defaultDecisionDeps(tg, log) {
+  return {
+    answer: (id, text) => answerCallback({ token: tg.token, id, text }),
+    edit: ({ chatId, messageId, text }) => editMessage({ token: tg.token, chatId, messageId, text }),
+    send: ({ chatId, text, replyMarkup }) => sendTelegramMessage({ token: tg.token, chatId, text, replyMarkup }),
+    kick: kickRelease,
+    now: () => Date.now(),
+    log,
+  };
+}
+
 export async function pollLoop(cfg) {
   const {
     dataDir, fetchImpl = fetch, sendImpl = sendTelegramMessage, log = console.log,
@@ -71,6 +91,7 @@ export async function pollLoop(cfg) {
     // 都在往同一条 ESTABLISHED 死连接上打),原地重试再多也醒不过来,只有换进程才行。
     pollFailLimit = 10, retryDelayMs = 5000,
     onGiveUp = () => process.exit(1),
+    opsDir = DEFAULT_OPS_DIR, decisionDeps,
   } = cfg;
   const offsetFile = join(dataDir, 'tg-offset.json');
   let pollFails = 0;
@@ -101,9 +122,16 @@ export async function pollLoop(cfg) {
     }
     pollFails = 0;
 
+    const dctx = { chatId: tg.chatId, dataDir, opsDir, deps: decisionDeps ?? defaultDecisionDeps(tg, log) };
     let failed = false;
     for (const u of updates) {
       try {
+        if (u.callback_query) {
+          const tag = await handleCallback(u, dctx);
+          log(`[hippo-listen] callback ${u.update_id}: ${tag}`);
+          await writeJSONAtomic(offsetFile, { offset: u.update_id + 1 });
+          continue;
+        }
         const reply = await handleUpdate(u, { chatId: tg.chatId, dataDir });
         if (reply) {
           await sendImpl({ token: tg.token, chatId: tg.chatId, text: reply });
@@ -122,6 +150,7 @@ export async function pollLoop(cfg) {
       }
       await writeJSONAtomic(offsetFile, { offset: u.update_id + 1 });
     }
+    try { await settleDecisions(dctx); } catch (e) { log(`[hippo-listen] settle error: ${e.message ?? e}`); }
     if (cfg.once) return;
     if (failed) await sleep(5000);
   }

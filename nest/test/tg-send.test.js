@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sendTelegramMessage, sendTelegramPhoto, splitForTelegram, formatHippoCardText, formatFollowupText, formatBookCardText, formatBookFollowupText, hippoFollowupBody } from '../lib/tg-send.js';
+import { sendTelegramMessage, sendTelegramPhoto, answerCallback, editMessage, splitForTelegram, formatHippoCardText, formatFollowupText, formatBookCardText, formatBookFollowupText, hippoFollowupBody } from '../lib/tg-send.js';
 
 const ok = { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 1 } }) };
 const bad = { ok: false, status: 502, json: async () => ({ ok: false, description: 'bad gateway' }) };
@@ -190,4 +190,33 @@ test('fallback 卡在条子上方标出「这组是兜底问题」,正常卡不�
   const hCard = { pageTitle: 'P', pageFile: 'concepts/P.md', body: 'B', mutter: 'M', followups: ['F1', 'F2', 'F3'] };
   assert.ok(!formatHippoCardText({ ...hCard, fallback: true }, '2026-07-05').includes('兜底的通用问题'));
   assert.ok(!formatHippoCardText(hCard, '2026-07-05').includes('兜底的通用问题'));
+});
+
+test('replyMarkup 只挂在最后一段;不传就不出现', async () => {
+  const bodies = [];
+  const fetchImpl = async (url, o) => { bodies.push(JSON.parse(o.body)); return ok; };
+  const kb = { inline_keyboard: [[{ text: '发', callback_data: 'd:abc123:go' }]] };
+  await sendTelegramMessage({ token: 't', chatId: 1, text: `${'a'.repeat(4000)}\n${'b'.repeat(200)}`, replyMarkup: kb }, { fetchImpl });
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[0].reply_markup, undefined);
+  assert.deepEqual(bodies[1].reply_markup, kb);
+  bodies.length = 0;
+  await sendTelegramMessage({ token: 't', chatId: 1, text: 'x' }, { fetchImpl });
+  assert.equal('reply_markup' in bodies[0], false);
+});
+
+test('answerCallback 只试一次:失败直接抛,不吃 3×15 秒重试', async () => {
+  let calls = 0;
+  await assert.rejects(answerCallback({ token: 't', id: 'q' }, { fetchImpl: async () => { calls++; return bad; } }));
+  assert.equal(calls, 1);
+});
+
+test('editMessage 默认带空键盘去按钮、长文封顶 4000;not modified 当成功,别的 400 抛出', async () => {
+  let body;
+  await editMessage({ token: 't', chatId: 1, messageId: 5, text: 'x'.repeat(5000) }, { fetchImpl: async (u, o) => { body = JSON.parse(o.body); return ok; } });
+  assert.deepEqual(body.reply_markup, { inline_keyboard: [] });
+  assert.equal(body.text.length, 4000);
+  const r400 = (d) => async () => ({ ok: false, status: 400, json: async () => ({ ok: false, error_code: 400, description: d }) });
+  assert.equal(await editMessage({ token: 't', chatId: 1, messageId: 5, text: 'x' }, { fetchImpl: r400('Bad Request: message is not modified') }), true);
+  await assert.rejects(editMessage({ token: 't', chatId: 1, messageId: 5, text: 'x' }, { fetchImpl: r400('Bad Request: message to edit not found') }), (e) => e.telegramCode === 400);
 });
