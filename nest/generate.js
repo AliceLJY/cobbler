@@ -58,14 +58,12 @@ export async function runPipeline(cfg) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const HOME = process.env.HOME;
-  const claudeBin = process.env.COBBLER_CLAUDE_BIN; // 兜底演练用:指向不存在路径可模拟 claude 不可用
   runPipeline({
     learningsDir: `${HOME}/Downloads/sync-bridge/cc-memory/learnings`,
     projectsDir: `${HOME}/Projects`,
     dataDir: new URL('./data', import.meta.url).pathname,
     personaPath: new URL('./persona.md', import.meta.url).pathname,
     todayISO: localDateISO(),
-    ...(claudeBin ? { claudeGen: (input) => generateWithClaude(input, { claudeBin }) } : {}),
   }).then(
     (s) => { console.log(`[cobbler-nest] ok mood=${s.mood}`); },
     (e) => { console.error('[cobbler-nest] fail', e); process.exitCode = 1; },

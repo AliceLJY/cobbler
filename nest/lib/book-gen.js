@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { truncate } from './templates.js';
 import { claudePrintArgs, parseClaudeJSON, UNTRUSTED_SOURCE_NOTICE, FOLLOWUP_JUDGMENT_RULES, FOLLOWUP_BREVITY_RULES,
   clipForLog, describeExecFailure, describeBadCard, describeBadFollowups, describeVoiceLeaks, describeOverlong,
-  execClaude, stripFollowupJunk } from './claude-gen.js';
+  execClaude, stripFollowupJunk, resolveClaudeBin } from './claude-gen.js';
 
 const pexec = promisify(execFile);
 
@@ -67,7 +67,7 @@ export async function generateBookCard(input, opts = {}) {
 
 async function generateBookCardOnce(input, opts = {}) {
   const {
-    claudeBin = `${process.env.HOME}/.local/bin/claude`,
+    claudeBin = resolveClaudeBin(),
     execImpl = pexec,
     // 30 分钟 ≈ 不设限:实测生成最长 167s,这里留了 10 倍余量,
     // 正常生成不可能被它砍掉 —— Alice 2026-08-27 明确「不要限制超时都没问题,

@@ -79,12 +79,10 @@ export async function bookCardMain(cfg, io = {}) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const HOME = process.env.HOME;
-  const claudeBin = process.env.COBBLER_CLAUDE_BIN;
   bookCardMain({
     ebooksRoot: process.env.COBBLER_EBOOKS_DIR ?? `${HOME}/Downloads/hermes-shared/ebooks/cc-ingested`,
     dataDir: new URL('./data', import.meta.url).pathname,
     personaPath: new URL('./persona.md', import.meta.url).pathname,
     todayISO: localDateISO(),
-    ...(claudeBin ? { bookGen: (input) => generateBookCard(input, { claudeBin }) } : {}),
   });
 }

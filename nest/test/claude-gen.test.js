@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateWithClaude, buildPrompt } from '../lib/claude-gen.js';
+import { generateWithClaude, buildPrompt, resolveClaudeBin } from '../lib/claude-gen.js';
 
 const input = { persona: 'P', mood: 'calm', item: { title: 't', detail: 'd', date: '2026-05-02', kind: 'learning' }, relTimeStr: '2 个月前的今天', needDiary: false, daysAway: 0 };
 
@@ -82,4 +82,31 @@ test('needDiary 时 prompt 提及日记且结果保留 diary', async () => {
   const execImpl = async () => ({ stdout: JSON.stringify({ cardTitle: 'T', cardBody: 'B', mutter: 'M', diary: 'D' }) });
   const r = await generateWithClaude({ ...input, needDiary: true }, { execImpl });
   assert.equal(r.diary, 'D');
+});
+
+test('resolveClaudeBin: 优先 COBBLER_CLAUDE_BIN，其次 ~/.local/bin/claude，最后回退 PATH 上的 claude', () => {
+  assert.equal(
+    resolveClaudeBin({ COBBLER_CLAUDE_BIN: '/custom/claude', HOME: '/home/u' }, () => true),
+    '/custom/claude',
+  );
+  assert.equal(
+    resolveClaudeBin({ HOME: '/home/u' }, (p) => p === '/home/u/.local/bin/claude'),
+    '/home/u/.local/bin/claude',
+  );
+  assert.equal(
+    resolveClaudeBin({ HOME: '/home/u' }, () => false),
+    'claude',
+  );
+});
+
+test('claude 二进制不存在时通过 onFail 报出 ENOENT', async () => {
+  const seen = [];
+  const r = await generateWithClaude(input, {
+    claudeBin: '/nonexistent/claude-bin-for-test',
+    attempts: 1,
+    onFail: (m) => seen.push(m),
+  });
+  assert.equal(r, null);
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], /ENOENT/);
 });

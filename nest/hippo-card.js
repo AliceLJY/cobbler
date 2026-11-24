@@ -79,12 +79,10 @@ export async function hippoCardMain(cfg, io = {}) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const HOME = process.env.HOME;
-  const claudeBin = process.env.COBBLER_CLAUDE_BIN;
   hippoCardMain({
     hippoDir: process.env.COBBLER_HIPPO_DIR ?? `${HOME}/knowledge-vault`,
     dataDir: new URL('./data', import.meta.url).pathname,
     personaPath: new URL('./persona.md', import.meta.url).pathname,
     todayISO: localDateISO(),
-    ...(claudeBin ? { hippoGen: (input) => generateHippoCard(input, { claudeBin }) } : {}),
   });
 }
