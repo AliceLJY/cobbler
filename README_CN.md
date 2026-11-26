@@ -32,15 +32,18 @@ Mac mini(巢)                                   Android 手机(身体)
 ## 巢的快速开始
 
 ```sh
-cd nest
+git clone https://github.com/AliceLJY/cobbler.git   # 要完整克隆:有一条测试读旧提交,--depth 1 会让它失败
+cd cobbler/nest
 npm test                 # node:test 测试,无运行时依赖
-node generate.js         # 手动跑一轮每日管线
+node generate.js         # 手动跑一轮每日管线(会调用本机的 Claude CLI,不想调用见下文)
 node server.js           # API 起在 127.0.0.1:8790
 bash install.sh          # 安装或重载全部五个个人 launchd 服务
 tailscale serve --bg --https=10000 http://127.0.0.1:8790   # 在 tailnet 内暴露
 ```
 
-`install.sh` 是 Alice 的 Mac mini 专用接线,launchd 模板要求仓库位于 `~/Projects/cobbler`。三条 Telegram 投喂和监听器还需要被 git 忽略的 `nest/data/tg.json`;藏书与知识页投喂依赖 Alice 本机的资料库。只运行 API 或 Android app 不需要这些可选条件。知识页投喂的资料库路径默认是 `~/knowledge-vault`,可用 `COBBLER_HIPPO_DIR` 环境变量指向你自己的笔记目录。
+`node generate.js` 会把选中的历史文本交给 Claude CLI(依次找 `COBBLER_CLAUDE_BIN`、`~/.local/bin/claude`、`PATH` 里的 `claude`)。只想试跑、不调用 Claude 时,把 `COBBLER_CLAUDE_BIN` 指向一个不存在的路径(例如 `COBBLER_CLAUDE_BIN=/nonexistent node generate.js`):它会打两行 `claude 调用失败`,改用模板兜底,照样写出 `nest/data/state.json`。机器上没有符合条件的历史时,`GET /api/card/today` 会返回 `{"error":"no card today",...}`,这是正常的。
+
+`install.sh` 和 `tailscale serve` 需要 macOS(launchd)和已登录的 Tailscale。`install.sh` 是 Alice 的 Mac mini 专用接线,launchd 模板要求仓库位于 `~/Projects/cobbler`。三条 Telegram 投喂和监听器还需要被 git 忽略的 `nest/data/tg.json`;藏书与知识页投喂依赖 Alice 本机的资料库。只运行 API 或 Android app 不需要这些可选条件。知识页投喂的资料库路径默认是 `~/knowledge-vault`,可用 `COBBLER_HIPPO_DIR` 环境变量指向你自己的笔记目录。
 
 本机可选设置（知识库路径、电子书路径、Claude 可执行文件与模型、端口/主机）写在 `~/.config/cobbler/env`，一行一个 `KEY=VALUE`，不入仓；`install.sh` 会读取该文件并写进每个 launchd plist，重跑不丢。可用键：`COBBLER_HIPPO_DIR`、`COBBLER_EBOOKS_DIR`、`COBBLER_CLAUDE_BIN`、`COBBLER_CLAUDE_MODEL`、`COBBLER_PORT`、`COBBLER_HOST`。
 

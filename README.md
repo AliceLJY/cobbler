@@ -32,15 +32,18 @@ Mac mini (the nest)                             Android phone (the body)
 ## Nest quick start
 
 ```sh
-cd nest
+git clone https://github.com/AliceLJY/cobbler.git   # full clone: one test reads an old commit, so --depth 1 makes it fail
+cd cobbler/nest
 npm test                 # node:test suite, no runtime dependencies
-node generate.js         # run the daily pipeline once
+node generate.js         # run the daily pipeline once (calls the installed Claude CLI; see below to skip it)
 node server.js           # serve the API on 127.0.0.1:8790
 bash install.sh          # install/reload all five personal launchd agents
 tailscale serve --bg --https=10000 http://127.0.0.1:8790   # expose inside your tailnet
 ```
 
-`install.sh` is personal Mac mini wiring: its launchd templates expect this repository at `~/Projects/cobbler`. The three Telegram feeds and listener also expect an ignored `nest/data/tg.json`; the book and knowledge feeds depend on Alice's local libraries. They are not required to run the API or Android app. The knowledge feed's library path defaults to `~/knowledge-vault`; override it with the `COBBLER_HIPPO_DIR` environment variable to point at your own notes directory.
+`node generate.js` sends selected history text to the Claude CLI (`COBBLER_CLAUDE_BIN`, else `~/.local/bin/claude`, else `claude` on your `PATH`). To try the pipeline without Claude, point `COBBLER_CLAUDE_BIN` at a path that does not exist (e.g. `COBBLER_CLAUDE_BIN=/nonexistent node generate.js`): it logs two `claude 调用失败` lines, falls back to templates, and still writes `nest/data/state.json`. On a machine with no matching history, `GET /api/card/today` then answers `{"error":"no card today",...}`; that is expected.
+
+`install.sh` and `tailscale serve` need macOS (launchd) and a Tailscale login. `install.sh` is personal Mac mini wiring: its launchd templates expect this repository at `~/Projects/cobbler`. The three Telegram feeds and listener also expect an ignored `nest/data/tg.json`; the book and knowledge feeds depend on Alice's local libraries. They are not required to run the API or Android app. The knowledge feed's library path defaults to `~/knowledge-vault`; override it with the `COBBLER_HIPPO_DIR` environment variable to point at your own notes directory.
 
 Optional machine-local settings (knowledge-vault path, ebook path, Claude binary/model, port/host) go in `~/.config/cobbler/env` as `KEY=VALUE` lines — never in the repo. `install.sh` reads that file and writes the keys into every launchd plist, so re-running it keeps them. Keys: `COBBLER_HIPPO_DIR`, `COBBLER_EBOOKS_DIR`, `COBBLER_CLAUDE_BIN`, `COBBLER_CLAUDE_MODEL`, `COBBLER_PORT`, `COBBLER_HOST`.
 
